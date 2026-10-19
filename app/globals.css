@@ -1,26 +1,163 @@
 @import "tailwindcss";
 
+/*
+ * Colour tokens. Light is the default; dark follows the OS unless the user picks
+ * light explicitly. High contrast and colour-blind palettes are data-attributes
+ * set from Display settings, so they work with either scheme.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f7f8fc;
+  --surface: #ffffff;
+  --surface-2: #eef1fa;
+  --ink: #1b1f2a;
+  --ink-muted: #4d5566;
+  --line: #d6dbe8;
+  --line-strong: #9aa3b8;
+  --accent: #3b5bdb;
+  --accent-hover: #2f4ac0;
+  --accent-fg: #ffffff;
+  --accent-ink: #2f4ac0;
+  --accent-soft: #dfe6fd;
+  --focus: #1b1f2a;
+  --ok: #2b8a3e;
+  --ok-bg: #d3f9d8;
+  --ok-ink: #1f5d2a;
+  --warn: #b7791f;
+  --warn-bg: #fff3bf;
+  --warn-ink: #6b4a10;
+  --danger: #c92a2a;
+  --danger-bg: #ffe3e3;
+  --danger-ink: #862020;
+  --highlight: #fff3bf;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --bg: #111420;
+    --surface: #1a1e2c;
+    --surface-2: #232a3d;
+    --ink: #eef1fa;
+    --ink-muted: #b4bccf;
+    --line: #343d55;
+    --line-strong: #6b7490;
+    --accent: #8ea6ff;
+    --accent-hover: #a8bbff;
+    --accent-fg: #0d1222;
+    --accent-ink: #b9c8ff;
+    --accent-soft: #263360;
+    --focus: #ffd43b;
+    --ok: #69db7c;
+    --ok-bg: #1d3b25;
+    --ok-ink: #b2f2bb;
+    --warn: #ffd43b;
+    --warn-bg: #3d3416;
+    --warn-ink: #ffec99;
+    --danger: #ff8787;
+    --danger-bg: #421c1c;
+    --danger-ink: #ffc9c9;
+    --highlight: #5c4d10;
   }
 }
 
+:root[data-theme="dark"] {
+  --bg: #111420;
+  --surface: #1a1e2c;
+  --surface-2: #232a3d;
+  --ink: #eef1fa;
+  --ink-muted: #b4bccf;
+  --line: #343d55;
+  --line-strong: #6b7490;
+  --accent: #8ea6ff;
+  --accent-hover: #a8bbff;
+  --accent-fg: #0d1222;
+  --accent-ink: #b9c8ff;
+  --accent-soft: #263360;
+  --focus: #ffd43b;
+  --ok: #69db7c;
+  --ok-bg: #1d3b25;
+  --ok-ink: #b2f2bb;
+  --warn: #ffd43b;
+  --warn-bg: #3d3416;
+  --warn-ink: #ffec99;
+  --danger: #ff8787;
+  --danger-bg: #421c1c;
+  --danger-ink: #ffc9c9;
+  --highlight: #5c4d10;
+}
+
+/* High contrast: stronger borders and text. */
+:root[data-contrast="high"] {
+  --ink: #000000;
+  --ink-muted: #1a1a1a;
+  --line: #000000;
+  --line-strong: #000000;
+  --surface-2: #e6eaf5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-contrast="high"] {
+    --ink: #ffffff;
+    --ink-muted: #eeeeee;
+    --line: #ffffff;
+    --line-strong: #ffffff;
+    --surface-2: #2a3350;
+  }
+}
+:root[data-theme="dark"][data-contrast="high"] {
+  --ink: #ffffff;
+  --ink-muted: #eeeeee;
+  --line: #ffffff;
+  --line-strong: #ffffff;
+  --surface-2: #2a3350;
+}
+
+/* Colour-blind friendly: blue/orange instead of red/green for trust and status. */
+:root[data-palette="colorblind"] {
+  --ok: #0072b2;
+  --ok-bg: #d6ebf7;
+  --ok-ink: #00405f;
+  --warn: #e69f00;
+  --warn-bg: #fdf0cc;
+  --warn-ink: #5c3d00;
+  --danger: #7a3e9d;
+  --danger-bg: #eadcf3;
+  --danger-ink: #3f1f55;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+:root[data-font="readable"] body {
+  font-family: Verdana, Tahoma, "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
+  word-spacing: 0.06em;
+}
+
+/* Text size: scales the root font so every rem-based size follows. */
+:root[data-text="lg"] { font-size: 118.75%; }
+:root[data-text="xl"] { font-size: 137.5%; }
+
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+mark.key {
+  background: var(--highlight);
+  color: inherit;
+  border-radius: 0.2em;
+  padding: 0 0.15em;
+}
+
+@media print {
+  header, nav, button, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  main { max-width: none; padding: 0; }
 }

@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Research Co-Pilot
 
-## Getting Started
+An AI co-pilot that turns a student's idea into well-sourced research, one step at a time.
+The flow follows the wireframes: **Start → Refine → Sources → Notes → Outline → Write → Review**.
 
-First, run the development server:
+Students sign in with email and password. Each account's projects are saved in Supabase and protected by
+row-level security, so nobody can read or change another student's work.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. You'll be sent to `/login` until Supabase is set up (below).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Setting up Supabase (database and sign-in)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a project at [supabase.com](https://supabase.com).
+2. In **SQL Editor**, run [`supabase/schema.sql`](supabase/schema.sql). It creates the `profiles` and
+   `projects` tables, their row-level security policies, and a trigger that makes a profile on sign-up.
+3. Copy `.env.example` to `.env.local` and set, from **Project Settings → API**:
 
-## Learn More
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+   Never put the `service_role` / secret key in a `NEXT_PUBLIC_` variable.
+4. In **Authentication → Sign In / Providers → Email**, turn **Confirm email** off. Students are signed in
+   as soon as they create an account; there is no verification email.
+5. Restart `pnpm dev`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Projects saved in a browser before sign-in existed are moved into the first account that signs in there.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Turning on the AI agents
 
-## Deploy on Vercel
+Without a key the app still runs. A simple built-in helper suggests angles, sorts notes,
+checks wording and finds gaps. Finding sources and checking claims against them needs Claude,
+which the app reaches through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create a key in the Vercel dashboard under **AI Gateway → API keys**.
+2. Copy `.env.example` to `.env.local` in the project root and set:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```bash
+   AI_GATEWAY_API_KEY=your-key-here
+   ```
+
+3. Restart `pnpm dev`. Next.js reads `.env.local` only at startup.
+
+On Vercel, add the same `AI_GATEWAY_API_KEY` under **Project Settings → Environment Variables**.
+Optional: `RESEARCH_COPILOT_MODEL` overrides the model (default `anthropic/claude-opus-5-5`).
+
+## Where the AI helps
+
+| Step | AI help |
+|---|---|
+| Start / Refine | Research Planner turns the idea into angles, questions and a plan |
+| Sources | Source Discovery searches the web (only links the search returned are kept); Document Analysis reads uploaded files |
+| Notes | Evidence Synthesis sorts notes into themes and flags contradictions |
+| Outline | Outline Builder groups notes into sections with a main idea each; Research Gap finds unanswered questions |
+| Write | Writing Partner drafts one section, or every empty section, from the student's notes and saved sources, with citations; Improve paragraph suggests wording |
+| Review | Fix with AI repairs flagged claims using saved sources; Feedback reviews the whole paper; Fix all corrects grammar |
+
+AI drafts are built only from the student's notes and saved sources. Citations to anything outside the
+bibliography are removed, drafts never overwrite text the student wrote, and each single-section draft is
+shown for the student to approve before it goes into the paper.
+
+## Checks
+
+```bash
+pnpm test     # unit tests (Vitest)
+pnpm lint     # ESLint
+pnpm exec tsc --noEmit
+pnpm build
+```
+
+## Structure
+
+- `app/` screens (one folder per wireframe step) and `app/api/agents/[agent]` (the agent endpoint)
+- `lib/agents/` agent input/output schemas and the offline helper
+- `lib/server/` Claude calls (server only); API key never reaches the browser
+- `proxy.ts`, `lib/supabase/` session refresh and page gating; Supabase clients for browser and server
+- `app/login`, `app/signup` sign-in and sign-up pages
+- `lib/db/` reads and writes the `projects` table; `lib/store.ts` keeps the open project in memory and saves changes
+- `supabase/schema.sql` tables, triggers and row-level security policies
+- `lib/checks.ts`, `lib/citations.ts`, `lib/credibility.ts` originality, grammar, citation and source-trust logic
+- `lib/i18n/` English and Hindi text (both must have every key)
+- `tests/` unit tests for the pure logic
+
+## Known limits
+
+- Source summaries come from web search results, not from reading each full page, so students should open
+  the original before relying on a fact.
+- Grammar and spelling checks cover English only. Hindi text is still checked for originality and citations.
+- Word export produces a `.doc` file from HTML. PDF is made with the browser's print dialog.
