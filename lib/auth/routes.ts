@@ -1,19 +1,28 @@
+/** Where a signed-in student lands: the form that starts a new project. */
+export const APP_HOME = "/start";
+
+/** The landing page. Guests see it at "/"; signed-in students are sent on to APP_HOME. */
+export const LANDING = "/";
+
+/** Where the password reset email link sends the student once /auth/confirm has signed them in. */
+export const RESET_PASSWORD = "/reset-password";
+
 /** Pages anyone can open without signing in. /auth/confirm is where the verification email link lands. */
-const PUBLIC_PATHS = ["/login", "/signup", "/auth/confirm"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/auth/confirm"];
 
 /** Pages a signed-in user is sent away from. */
-const GUEST_ONLY_PATHS = ["/login", "/signup"];
+const GUEST_ONLY_PATHS = ["/login", "/signup", "/forgot-password"];
 
 function matches(pathname: string, paths: string[]): boolean {
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export function isPublicPath(pathname: string): boolean {
-  return matches(pathname, PUBLIC_PATHS);
+  return pathname === LANDING || matches(pathname, PUBLIC_PATHS);
 }
 
 export function isGuestOnlyPath(pathname: string): boolean {
-  return matches(pathname, GUEST_ONLY_PATHS);
+  return pathname === LANDING || matches(pathname, GUEST_ONLY_PATHS);
 }
 
 /**

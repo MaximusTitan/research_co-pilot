@@ -6,7 +6,9 @@ import type { ReactNode } from "react";
 import { projectStore, useCurrentProject, useSaveStatus } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { supabaseBrowser } from "../lib/supabase/client";
+import { APP_HOME, LANDING } from "../lib/auth/routes";
 import { useAuthUser } from "./auth-provider";
+import { Logo } from "./logo";
 import { Button, LinkButton, Spinner } from "./ui";
 
 const STEPS = [
@@ -24,6 +26,9 @@ export function Shell({ children }: { children: ReactNode }) {
   const { project } = useCurrentProject();
   const user = useAuthUser();
 
+  // The landing page brings its own header and footer.
+  if (pathname === LANDING) return <>{children}</>;
+
   return (
     <div className="flex min-h-full flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-[var(--surface)] focus:p-2">
@@ -31,8 +36,8 @@ export function Shell({ children }: { children: ReactNode }) {
       </a>
       <header className="border-b border-[var(--line)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="text-lg font-bold text-[var(--accent-ink)]">
-            {t.appName}
+          <Link href={user ? APP_HOME : LANDING} className="rounded focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]">
+            <Logo height={30} preload />
           </Link>
           <nav aria-label={t.nav.mainNav} className="flex flex-wrap items-center gap-4 text-sm">
             {user ? (
@@ -47,7 +52,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </nav>
         </div>
         <SaveStatus />
-        {user && project && pathname !== "/" && pathname !== "/projects" ? (
+        {user && project && pathname !== APP_HOME && pathname !== "/projects" ? (
           <nav aria-label={t.nav.steps} className="border-t border-[var(--line)]">
             <ol className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-2 text-sm">
               {STEPS.map((step, i) => {
@@ -124,7 +129,7 @@ export function RequireProject({ children }: { children: (project: NonNullable<R
     return (
       <div className="flex flex-col items-start gap-4">
         <p>{t.common.noProject}</p>
-        <LinkButton href="/">{t.common.startProject}</LinkButton>
+        <LinkButton href={APP_HOME}>{t.common.startProject}</LinkButton>
       </div>
     );
   }

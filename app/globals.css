@@ -149,6 +149,45 @@ body {
   scroll-behavior: auto !important;
 }
 
+/*
+ * Brand colours from the Research Mate logo. Used for the landing page and
+ * the logo itself; the app UI keeps the calmer tokens above.
+ */
+:root {
+  --brand-blue: #3c3ff2;
+  --brand-navy: #100c52;
+  --brand-green: #6ee58a;
+  --brand-lime: #c6f61c;
+  --brand-sky: #8fd0f0;
+}
+
+/* Logo swap: navy lettering on light backgrounds, light lettering on dark. */
+.logo-on-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo-on-light { display: none; }
+  :root:not([data-theme="light"]) .logo-on-dark { display: block; }
+}
+:root[data-theme="dark"] .logo-on-light { display: none; }
+:root[data-theme="dark"] .logo-on-dark { display: block; }
+
+/* Landing page: a highlighter stroke in the logo's green-to-lime. */
+.brand-mark {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--brand-green) 70%, transparent), color-mix(in srgb, var(--brand-lime) 75%, transparent));
+  background-size: 100% 0.42em;
+  background-position: 0 88%;
+  background-repeat: no-repeat;
+  padding: 0 0.08em;
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.rise-in { animation: rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .rise-in { animation: none; }
+}
+
 mark.key {
   background: var(--highlight);
   color: inherit;
@@ -159,5 +198,7 @@ mark.key {
 @media print {
   header, nav, button, .no-print { display: none !important; }
   body { background: #fff; color: #000; }
+  .logo-on-light { display: block !important; }
+  .logo-on-dark { display: none !important; }
   main { max-width: none; padding: 0; }
 }

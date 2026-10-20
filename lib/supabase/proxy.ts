@@ -1,11 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isGuestOnlyPath, isPublicPath } from "../auth/routes";
+import { APP_HOME, isGuestOnlyPath, isPublicPath } from "../auth/routes";
 import { supabaseEnv } from "./env";
 
 /**
  * Refreshes the Supabase session cookie on every request and gates pages:
- * guests go to /login, signed-in users skip /login and /signup, and API
+ * guests go to /login, signed-in users skip the landing page, /login and /signup, and API
  * calls without a session get a 401.
  */
 export async function updateSession(request: NextRequest) {
@@ -37,13 +37,13 @@ export async function updateSession(request: NextRequest) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = "";
-    if (pathname !== "/") login.searchParams.set("next", `${pathname}${search}`);
+    login.searchParams.set("next", `${pathname}${search}`);
     return redirectWithCookies(login, response);
   }
 
   if (signedIn && isGuestOnlyPath(pathname)) {
     const home = request.nextUrl.clone();
-    home.pathname = "/";
+    home.pathname = APP_HOME;
     home.search = "";
     return redirectWithCookies(home, response);
   }

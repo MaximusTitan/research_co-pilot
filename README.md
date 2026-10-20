@@ -1,6 +1,6 @@
-# Research Co-Pilot
+# Research Mate
 
-An AI co-pilot that turns a student's idea into well-sourced research, one step at a time.
+An AI research partner that turns a student's idea into well-sourced research, one step at a time.
 The flow follows the wireframes: **Start → Refine → Sources → Notes → Outline → Write → Review**.
 
 Students sign up with email and password and confirm their email before signing in. Each account's projects are saved in Supabase and protected by
@@ -41,6 +41,14 @@ Open http://localhost:3000. You'll be sent to `/login` until Supabase is set up 
      ```
 
      Without this change the default link still works, but only in the browser the student signed up in.
+   - **Authentication → Emails → Reset Password**: same idea, for the "Forgot password?" email:
+
+     ```html
+     <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">Choose a new password</a>
+     ```
+
+     The link signs the student in at `/auth/confirm` and sends them to `/reset-password`. Without this
+     change it only works in the browser that asked for the email.
    - Supabase's built-in mailer sends only a few emails an hour; set up custom SMTP under
      **Project Settings → Authentication** before real students sign up.
 5. Restart `pnpm dev`.
@@ -63,7 +71,7 @@ which the app reaches through [Vercel AI Gateway](https://vercel.com/docs/ai-gat
 3. Restart `pnpm dev`. Next.js reads `.env.local` only at startup.
 
 On Vercel, add the same `AI_GATEWAY_API_KEY` under **Project Settings → Environment Variables**.
-Optional: `RESEARCH_COPILOT_MODEL` overrides the model (default `anthropic/claude-opus-5-5`).
+Optional: `RESEARCH_MATE_MODEL` overrides the model (default `anthropic/claude-opus-5-5`).
 
 ## Where the AI helps
 
@@ -95,7 +103,8 @@ pnpm build
 - `lib/agents/` agent input/output schemas and the offline helper
 - `lib/server/` Claude calls (server only); API key never reaches the browser
 - `proxy.ts`, `lib/supabase/` session refresh and page gating; Supabase clients for browser and server
-- `app/login`, `app/signup` sign-in and sign-up pages; `app/auth/confirm` where the verification email link lands
+- `app/login`, `app/signup` sign-in and sign-up pages; `app/forgot-password`, `app/reset-password` the password reset flow;
+  `app/auth/confirm` where the verification and reset email links land
 - `lib/db/` reads and writes the `projects` table; `lib/store.ts` keeps the open project in memory and saves changes
 - `supabase/schema.sql` tables, triggers and row-level security policies
 - `lib/checks.ts`, `lib/citations.ts`, `lib/credibility.ts` originality, grammar, citation and source-trust logic

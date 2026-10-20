@@ -6,7 +6,7 @@ export type AgentCallResult<A extends AgentName> =
   | { ok: true; mode: "ai" | "offline"; data: AgentOutput<A> }
   | { ok: false };
 
-/** Calls a Research Co-Pilot agent. Never throws: callers show a friendly message instead. */
+/** Calls a Research Mate agent. Never throws: callers show a friendly message instead. */
 export async function callAgent<A extends AgentName>(name: A, input: AgentInput<A>): Promise<AgentCallResult<A>> {
   try {
     const res = await fetch(`/api/agents/${name}`, {

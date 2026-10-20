@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, Field, PageTitle } from "../../components/ui";
+import { Card, Field, LinkButton, PageTitle } from "../../components/ui";
+import { RESET_PASSWORD } from "../../lib/auth/routes";
 import { useT } from "../../lib/i18n";
 import { updateSettings, useSettings, type Settings } from "../../lib/settings";
 
@@ -47,6 +48,12 @@ export default function SettingsPage() {
         <Toggle id="palette" label={t.settings.palette} checked={s.palette === "colorblind"} onChange={(on) => updateSettings({ palette: on ? "colorblind" : "default" })} />
         <Toggle id="font" label={t.settings.font} checked={s.font === "readable"} onChange={(on) => updateSettings({ font: on ? "readable" : "default" })} />
         <Toggle id="motion" label={t.settings.motion} checked={s.motion === "reduced"} onChange={(on) => updateSettings({ motion: on ? "reduced" : "full" })} />
+      </Card>
+      <Card label={t.auth.password} className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="font-semibold">{t.auth.password}</h2>
+        <LinkButton href={RESET_PASSWORD} variant="secondary">
+          {t.auth.changePassword}
+        </LinkButton>
       </Card>
     </div>
   );

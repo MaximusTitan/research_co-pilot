@@ -21,7 +21,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle actions={<LinkButton href="/">{t.common.startProject}</LinkButton>}>{t.projects.title}</PageTitle>
+      <PageTitle actions={<LinkButton href="/start">{t.common.startProject}</LinkButton>}>{t.projects.title}</PageTitle>
       {list.length === 0 ? <p className="text-[var(--ink-muted)]">{t.projects.empty}</p> : null}
       <ul className="grid gap-4 sm:grid-cols-2">
         {list.map((p) => (
@@ -58,7 +58,7 @@ export default function ProjectsPage() {
         ))}
       </ul>
       <p className="text-sm">
-        <Link href="/" className="underline underline-offset-4">{t.common.startProject}</Link>
+        <Link href="/start" className="underline underline-offset-4">{t.common.startProject}</Link>
       </p>
     </div>
   );

@@ -189,10 +189,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
                 required
               />
             </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="size-4" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />
-              {t.auth.showPassword}
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="size-4" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} />
+                {t.auth.showPassword}
+              </label>
+              {isLogin ? (
+                <Link href="/forgot-password" className="text-sm font-semibold text-[var(--accent-ink)] underline underline-offset-4">
+                  {t.auth.forgotLink}
+                </Link>
+              ) : null}
+            </div>
             <Button type="submit" variant="primary" disabled={busy}>
               {busy ? (isLogin ? t.auth.loggingIn : t.auth.signingUp) : isLogin ? t.auth.login : t.auth.signup}
             </Button>

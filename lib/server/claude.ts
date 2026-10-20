@@ -10,7 +10,7 @@ import { searchedUrlsFrom } from "../agents/grounding";
  * Model ids use the gateway form "provider/model".
  */
 const GATEWAY_URL = "https://ai-gateway.vercel.sh";
-const MODEL = process.env.RESEARCH_COPILOT_MODEL || "anthropic/claude-opus-5-5";
+const MODEL = process.env.RESEARCH_MATE_MODEL || process.env.RESEARCH_COPILOT_MODEL || "anthropic/claude-opus-5-5";
 
 let client: Anthropic | null = null;
 
@@ -24,7 +24,7 @@ function getClient(): Anthropic {
   return client;
 }
 
-const SHARED_RULES = `You are one of six cooperating agents inside Research Co-Pilot, a tool that teaches students and other learners how to research their own ideas.
+const SHARED_RULES = `You are one of six cooperating agents inside Research Mate, a tool that teaches students and other learners how to research their own ideas.
 Rules for every answer:
 - Help the student learn. When you draft text, build it only from the student's own notes and saved sources, so they can read, check and edit it.
 - Never invent sources, authors, statistics or quotations. Only use facts that appear in the material you are given.

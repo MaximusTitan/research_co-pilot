@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Research Co-Pilot",
+  title: "Research Mate",
   description: "Turn an idea into well-sourced research, one step at a time.",
 };
 
