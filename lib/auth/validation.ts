@@ -28,6 +28,8 @@ export type AuthErrorKey =
   | "nameRequired"
   | "nameTooLong"
   | "invalidCredentials"
+  | "emailNotConfirmed"
+  | "linkInvalid"
   | "rateLimited"
   | "generic";
 
@@ -55,6 +57,8 @@ export function authErrorKey(code: string | undefined): AuthErrorKey {
   switch (code) {
     case "invalid_credentials":
       return "invalidCredentials";
+    case "email_not_confirmed":
+      return "emailNotConfirmed";
     case "weak_password":
       return "passwordWeak";
     case "over_request_rate_limit":

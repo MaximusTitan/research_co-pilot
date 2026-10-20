@@ -3,7 +3,7 @@
 An AI co-pilot that turns a student's idea into well-sourced research, one step at a time.
 The flow follows the wireframes: **Start → Refine → Sources → Notes → Outline → Write → Review**.
 
-Students sign in with email and password. Each account's projects are saved in Supabase and protected by
+Students sign up with email and password and confirm their email before signing in. Each account's projects are saved in Supabase and protected by
 row-level security, so nobody can read or change another student's work.
 
 ## Getting started
@@ -28,8 +28,21 @@ Open http://localhost:3000. You'll be sent to `/login` until Supabase is set up 
    ```
 
    Never put the `service_role` / secret key in a `NEXT_PUBLIC_` variable.
-4. In **Authentication → Sign In / Providers → Email**, turn **Confirm email** off. Students are signed in
-   as soon as they create an account; there is no verification email.
+4. Turn on email verification:
+   - **Authentication → Sign In / Providers → Email**: keep **Confirm email** on. New students get a link
+     and can't sign in until they open it.
+   - **Authentication → URL Configuration**: set **Site URL** to your app's address and add
+     `http://localhost:3000/auth/confirm` (and your deployed `https://…/auth/confirm`) to **Redirect URLs**.
+   - **Authentication → Emails → Confirm signup**: so the link also works when opened on another device
+     (a phone, a school computer), change the link to:
+
+     ```html
+     <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">Confirm your email</a>
+     ```
+
+     Without this change the default link still works, but only in the browser the student signed up in.
+   - Supabase's built-in mailer sends only a few emails an hour; set up custom SMTP under
+     **Project Settings → Authentication** before real students sign up.
 5. Restart `pnpm dev`.
 
 Projects saved in a browser before sign-in existed are moved into the first account that signs in there.
@@ -82,7 +95,7 @@ pnpm build
 - `lib/agents/` agent input/output schemas and the offline helper
 - `lib/server/` Claude calls (server only); API key never reaches the browser
 - `proxy.ts`, `lib/supabase/` session refresh and page gating; Supabase clients for browser and server
-- `app/login`, `app/signup` sign-in and sign-up pages
+- `app/login`, `app/signup` sign-in and sign-up pages; `app/auth/confirm` where the verification email link lands
 - `lib/db/` reads and writes the `projects` table; `lib/store.ts` keeps the open project in memory and saves changes
 - `supabase/schema.sql` tables, triggers and row-level security policies
 - `lib/checks.ts`, `lib/citations.ts`, `lib/credibility.ts` originality, grammar, citation and source-trust logic

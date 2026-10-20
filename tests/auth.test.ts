@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isGuestOnlyPath, isPublicPath, safeNextPath } from "../lib/auth/routes";
+import { confirmUrl, isGuestOnlyPath, isPublicPath, safeNextPath } from "../lib/auth/routes";
 import { authErrorKey, firstIssue, loginInput, signupInput } from "../lib/auth/validation";
 import { projectToRow, rowToProject } from "../lib/db/projects";
 import { dictionaries } from "../lib/i18n";
@@ -24,10 +24,11 @@ describe("post-login redirects", () => {
 });
 
 describe("route access", () => {
-  it("lets guests reach only the sign-in pages", () => {
+  it("lets guests reach only the sign-in pages and the email link", () => {
     expect(isPublicPath("/login")).toBe(true);
     expect(isPublicPath("/signup")).toBe(true);
-    expect(isPublicPath("/auth/confirm")).toBe(false);
+    expect(isPublicPath("/auth/confirm")).toBe(true);
+    expect(isPublicPath("/auth/other")).toBe(false);
     expect(isPublicPath("/")).toBe(false);
     expect(isPublicPath("/projects")).toBe(false);
     expect(isPublicPath("/loginx")).toBe(false);
@@ -36,6 +37,14 @@ describe("route access", () => {
   it("sends signed-in users away from login and signup only", () => {
     expect(isGuestOnlyPath("/login")).toBe(true);
     expect(isGuestOnlyPath("/projects")).toBe(false);
+    expect(isGuestOnlyPath("/auth/confirm")).toBe(false);
+  });
+});
+
+describe("verification email link", () => {
+  it("points at /auth/confirm on this site and carries a safe next", () => {
+    expect(confirmUrl("http://localhost:3000", "/notes")).toBe("http://localhost:3000/auth/confirm?next=%2Fnotes");
+    expect(confirmUrl("https://app.example.org", "//evil.com")).toBe("https://app.example.org/auth/confirm?next=%2F");
   });
 });
 
@@ -63,6 +72,7 @@ describe("auth form validation", () => {
   it("keeps unknown Supabase errors generic so accounts can't be probed", () => {
     expect(authErrorKey("invalid_credentials")).toBe("invalidCredentials");
     expect(authErrorKey("over_email_send_rate_limit")).toBe("rateLimited");
+    expect(authErrorKey("email_not_confirmed")).toBe("emailNotConfirmed");
     expect(authErrorKey("user_already_exists")).toBe("generic");
     expect(authErrorKey(undefined)).toBe("generic");
   });
