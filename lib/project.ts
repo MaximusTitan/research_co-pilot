@@ -258,6 +258,24 @@ export function restoreArrangement(p: Project, before: Arrangement): Project {
 
 export const STEP_PATHS = ["/refine", "/sources", "/notes", "/outline", "/write", "/review"] as const;
 
+/** Whether a step already has the student's work in it, for the progress marks in the step bar. */
+export function stepHasWork(p: Project, step: (typeof STEP_PATHS)[number]): boolean {
+  switch (step) {
+    case "/refine":
+      return Boolean(p.question);
+    case "/sources":
+      return p.sources.some((s) => s.saved);
+    case "/notes":
+      return p.notes.length > 0;
+    case "/outline":
+      return p.sections.some((s) => s.kind === "body");
+    case "/write":
+      return p.sections.some((s) => s.draft.trim());
+    default:
+      return false;
+  }
+}
+
 /** Where to send the student when they reopen a project. */
 export function resumePath(p: Project): string {
   return STEP_PATHS.find((s) => s === p.lastStep) ?? STEP_PATHS[0];

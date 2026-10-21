@@ -85,7 +85,7 @@ export default function StartPage() {
               return (
                 <label
                   key={w.value}
-                  className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 p-4 text-center transition-colors focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-[var(--focus)] ${
+                  className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 p-4 text-center transition-colors duration-150 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-[var(--focus)] ${
                     selected ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
                   }`}
                 >
@@ -107,8 +107,8 @@ export default function StartPage() {
               return (
                 <label
                   key={g}
-                  className={`cursor-pointer rounded-lg border-2 px-4 py-2 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-[var(--focus)] ${
-                    selected ? "border-[var(--accent)] bg-[var(--accent-soft)] font-semibold" : "border-[var(--line)] bg-[var(--surface)]"
+                  className={`cursor-pointer rounded-lg border-2 px-4 py-2 transition-colors duration-150 focus-within:outline-3 focus-within:outline-offset-2 focus-within:outline-[var(--focus)] ${
+                    selected ? "border-[var(--accent)] bg-[var(--accent-soft)] font-semibold" : "border-[var(--line)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
                   }`}
                 >
                   <input type="radio" name="grade" value={g} checked={selected} onChange={() => setGrade(g)} className="sr-only" />

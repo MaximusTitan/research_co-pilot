@@ -203,7 +203,7 @@ ${preview.text}` : preview.text;
       </PageTitle>
 
       {bulkDrafts.length > 0 ? (
-        <Card as="section" label={t.write.draftAllTitle} className="border-2 border-[var(--accent)]">
+        <Card as="section" label={t.write.draftAllTitle} className="fade-up border-2 border-[var(--accent)] shadow-[var(--shadow-lg)]">
           <h2 className="font-semibold">✨ {t.write.draftAllTitle}</h2>
           <p className="mb-3 text-sm text-[var(--ink-muted)]">{t.write.draftWarning}</p>
           {bulkOffline ? <div className="mb-3"><Notice tone="warn">{t.common.offlineHint}</Notice></div> : null}
@@ -249,7 +249,7 @@ ${preview.text}` : preview.text;
                     setPreview(null);
                     setMessage(null);
                   }}
-                  className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-2 text-left ${
+                  className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-2 text-left transition-colors duration-150 ${
                     s.id === section.id ? "bg-[var(--accent)] font-semibold text-[var(--accent-fg)]" : "bg-[var(--surface)] hover:bg-[var(--surface-2)]"
                   }`}
                 >
@@ -261,8 +261,8 @@ ${preview.text}` : preview.text;
         </nav>
 
         <section aria-label={t.write.editorLabel(section.title)} className="flex min-w-0 flex-col gap-3">
+          <h2 className="text-lg font-bold">{sectionName(section, t)}</h2>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="mr-auto text-lg font-bold">{sectionName(section, t)}</h2>
             <Button variant="primary" onClick={draftSection} disabled={drafting || bulk !== null}>
               {drafting ? <Spinner label={t.write.drafting} /> : `✨ ${t.write.draftAi}`}
             </Button>
@@ -282,14 +282,14 @@ ${preview.text}` : preview.text;
               projectStore.update((p) => setDraft(p, section.id, value));
             }}
             placeholder={t.write.placeholder}
-            className="min-h-[24rem] w-full rounded-xl border border-[var(--line-strong)] bg-[var(--surface)] p-4 text-lg leading-relaxed focus-visible:outline-3 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
+            className="min-h-[24rem] w-full rounded-xl border border-[var(--line-strong)] bg-[var(--surface)] p-4 text-lg leading-relaxed shadow-[var(--shadow-sm)] transition-[border-color,box-shadow] duration-150 focus-visible:border-[var(--accent)] focus-visible:outline-3 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
           />
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--ink-muted)]">
-            <span>{t.write.wordCount(words)}</span>
+            <span className="tabular-nums">{t.write.wordCount(words)}</span>
             <span>{t.write.footer}</span>
           </div>
           {preview && preview.sectionId === section.id ? (
-            <Card as="section" label={t.write.draftTitle} className="border-2 border-[var(--accent)]">
+            <Card as="section" label={t.write.draftTitle} className="fade-up border-2 border-[var(--accent)] shadow-[var(--shadow-lg)]">
               <p className="font-semibold">✨ {t.write.draftTitle}</p>
               <p className="mb-3 text-sm text-[var(--ink-muted)]">{t.write.draftWarning}</p>
               {preview.offline ? <div className="mb-3"><Notice tone="warn">{t.common.offlineHint}</Notice></div> : null}
@@ -311,7 +311,7 @@ ${preview.text}` : preview.text;
           {message ? <Notice>{message}</Notice> : null}
           {error ? <Notice tone="error">{error}</Notice> : null}
           {suggestions.length > 0 ? (
-            <ul className="flex flex-col gap-3" aria-label={t.write.improve}>
+            <ul className="fade-up flex flex-col gap-3" aria-label={t.write.improve}>
               {suggestions.map((s) => (
                 <li key={s.id}>
                   <Card>

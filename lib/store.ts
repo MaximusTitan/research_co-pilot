@@ -116,6 +116,10 @@ export function useCurrentProject(): { ready: boolean; project: Project | null }
 }
 
 export const projectStore = {
+  /** The current state outside React, or null until the user's projects have loaded. */
+  snapshot(): StoreState | null {
+    return cache;
+  },
   /** Loads the signed-in user's projects. Called by the auth provider whenever the user changes. */
   async load(uid: string) {
     if (userId === uid && cache) return;
@@ -168,6 +172,17 @@ export const projectStore = {
     const s = cache ?? { currentId: null, projects: {} };
     write({ currentId: project.id, projects: { ...s.projects, [project.id]: project } }, [project.id]);
     rememberCurrent(project.id);
+  },
+  /**
+   * Adds a project to the list without opening it, below the student's own work.
+   * Returns false if the list hasn't loaded, so nothing is added on top of a failed load.
+   */
+  insert(project: Project): boolean {
+    if (!cache || loadFailed) return false;
+    const oldest = Math.min(...Object.values(cache.projects).map((p) => p.updatedAt));
+    const placed = Number.isFinite(oldest) ? { ...project, createdAt: oldest - 1000, updatedAt: oldest - 1000 } : project;
+    write({ ...cache, projects: { ...cache.projects, [placed.id]: placed } }, [placed.id]);
+    return true;
   },
   select(id: string) {
     if (!cache?.projects[id]) return;

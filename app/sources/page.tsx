@@ -30,6 +30,16 @@ function Sources({ project }: { project: Project }) {
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
+  const readerRef = useRef<HTMLElement>(null);
+
+  /** Selects a source; on narrow screens the reader sits below the list, so bring it into view. */
+  function select(id: string) {
+    setSelectedId(id);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      readerRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    }
+  }
 
   const question = project.question ?? project.topic;
 
@@ -63,8 +73,7 @@ function Sources({ project }: { project: Project }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle>{t.sources.title}</PageTitle>
-      <p className="-mt-4 text-[var(--ink-muted)]">{question}</p>
+      <PageTitle subtitle={question}>{t.sources.title}</PageTitle>
 
       <div role="group" aria-label={t.sources.title} className="flex flex-wrap gap-2">
         {(
@@ -92,17 +101,18 @@ function Sources({ project }: { project: Project }) {
               const isSelected = selected?.id === s.id;
               return (
                 <li key={s.id}>
+                  {/* The title button stretches over the whole card, so a click anywhere selects it; the action buttons sit above it. */}
                   <div
-                    className={`rounded-xl border-2 p-4 transition-colors ${
-                      isSelected ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--line)] bg-[var(--surface)]"
+                    className={`group relative cursor-pointer rounded-xl border-2 p-4 transition-colors duration-150 has-[button[aria-current]:focus-visible]:outline-3 has-[button[aria-current]:focus-visible]:outline-offset-2 has-[button[aria-current]:focus-visible]:outline-[var(--focus)] ${
+                      isSelected ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--line-strong)] hover:bg-[var(--surface-2)]"
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <button
                         type="button"
-                        aria-current={isSelected ? "true" : undefined}
-                        onClick={() => setSelectedId(s.id)}
-                        className="text-left font-semibold underline-offset-4 hover:underline focus-visible:outline-3 focus-visible:outline-[var(--focus)]"
+                        aria-current={isSelected ? "true" : "false"}
+                        onClick={() => select(s.id)}
+                        className="text-left font-semibold underline-offset-4 outline-none group-hover:underline after:absolute after:inset-0 after:rounded-xl after:content-['']"
                       >
                         {s.title}
                       </button>
@@ -112,7 +122,7 @@ function Sources({ project }: { project: Project }) {
                       {[s.publisher, s.year, t.sources.kinds[s.kind]].filter(Boolean).join(" · ")}
                     </p>
                     <p className="mt-1 line-clamp-2">{s.summary}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="relative z-10 mt-2 flex flex-wrap gap-2">
                       <Button
                         className="min-h-9 px-3 text-sm"
                         aria-pressed={s.saved}
@@ -140,7 +150,7 @@ function Sources({ project }: { project: Project }) {
           </div>
         </section>
 
-        <aside aria-label={t.sources.reading} className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
+        <aside ref={readerRef} aria-label={t.sources.reading} className="flex min-w-0 scroll-mt-4 flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
           {selected ? <Reader source={selected} /> : <Card><p>{t.sources.pickOne}</p></Card>}
           <UploadDocument project={project} question={question} />
         </aside>

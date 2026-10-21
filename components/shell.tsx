@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { STEP_PATHS } from "../lib/project";
+import { STEP_PATHS, stepHasWork } from "../lib/project";
 import { projectStore, useCurrentProject, useSaveStatus } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { supabaseBrowser } from "../lib/supabase/client";
@@ -42,18 +42,18 @@ export function Shell({ children }: { children: ReactNode }) {
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-[var(--surface)] focus:p-2">
         {t.common.skipToContent}
       </a>
-      <header className="border-b border-[var(--line)] bg-[var(--surface)]">
+      <header className="border-b border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)] print:shadow-none">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <Link href={user ? APP_HOME : LANDING} className="rounded focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[var(--focus)]">
             <Logo height={30} preload />
           </Link>
           <nav aria-label={t.nav.mainNav} className="flex flex-wrap items-center gap-4 text-sm">
             {user ? (
-              <Link href="/projects" className="underline-offset-4 hover:underline">
+              <Link href="/projects" className="text-[var(--ink-muted)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline">
                 {t.nav.myProjects}
               </Link>
             ) : null}
-            <Link href="/settings" className="underline-offset-4 hover:underline">
+            <Link href="/settings" className="text-[var(--ink-muted)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline">
               {t.nav.settings}
             </Link>
             {user ? <AccountMenu name={user.displayName ?? user.email ?? ""} /> : null}
@@ -62,20 +62,36 @@ export function Shell({ children }: { children: ReactNode }) {
         <SaveStatus />
         {user && project && pathname !== APP_HOME && pathname !== "/projects" ? (
           <nav aria-label={t.nav.steps} className="border-t border-[var(--line)]">
-            <ol className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-2 text-sm">
+            <ol className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 py-2 text-sm">
               {STEPS.map((step, i) => {
                 const current = pathname === step.href;
+                const done = !current && stepHasWork(project, step.href);
                 return (
-                  <li key={step.href}>
+                  <li key={step.href} className="flex items-center gap-1">
+                    {i > 0 ? <span aria-hidden className="h-px w-3 shrink-0 bg-[var(--line-strong)] sm:w-5" /> : null}
                     <Link
                       href={step.href}
                       aria-current={current ? "step" : undefined}
-                      className={`inline-flex min-h-9 items-center gap-2 rounded-full px-3 py-1 whitespace-nowrap ${
-                        current ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "hover:bg-[var(--surface-2)]"
+                      className={`inline-flex min-h-9 items-center gap-2 rounded-full py-1 pr-3 pl-1.5 whitespace-nowrap transition-colors duration-150 ${
+                        current ? "bg-[var(--accent)] font-semibold text-[var(--accent-fg)]" : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
                       }`}
                     >
-                      <span aria-hidden className="font-semibold">{i + 1}</span>
+                      <span
+                        aria-hidden
+                        className={`grid size-6 place-items-center rounded-full text-xs font-semibold tabular-nums ${
+                          current ? "bg-[var(--accent-fg)] text-[var(--accent)]" : done ? "bg-[var(--accent-soft)] text-[var(--accent-ink)]" : "bg-[var(--surface-2)]"
+                        }`}
+                      >
+                        {done ? (
+                          <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m3.5 8.5 3 3 6-7" />
+                          </svg>
+                        ) : (
+                          i + 1
+                        )}
+                      </span>
                       {t.nav[step.key]}
+                      {done ? <span className="sr-only">({t.nav.stepDone})</span> : null}
                     </Link>
                   </li>
                 );

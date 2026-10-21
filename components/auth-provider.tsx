@@ -1,7 +1,9 @@
 "use client";
 
 import { createContext, use, useEffect, useState, type ReactNode } from "react";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { fetchDisplayName } from "../lib/db/projects";
+import { SHOWCASE_TOPIC, showcaseProject } from "../lib/showcase";
 import { projectStore } from "../lib/store";
 import { supabaseBrowser } from "../lib/supabase/client";
 
@@ -39,7 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Supabase warns against awaiting its own calls inside this callback, so defer them.
       window.setTimeout(() => {
         if (!active) return;
-        void projectStore.load(next.id);
+        void projectStore.load(next.id).then(() => {
+          if (active) addShowcaseOnce(supabase, next);
+        });
         void fetchDisplayName(supabase, next.id).then((displayName) => {
           if (active && displayName) setUser((prev) => (prev?.id === next.id ? { ...prev, displayName } : prev));
         });
@@ -52,4 +56,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return <AuthContext value={user}>{children}</AuthContext>;
+}
+
+const SHOWCASE_FLAG = "showcase_added";
+
+/**
+ * Gives every account its own copy of the showcase project, once. The flag is
+ * kept on the account so a student who deletes it doesn't get it back.
+ */
+function addShowcaseOnce(supabase: SupabaseClient, user: User) {
+  if (user.user_metadata?.[SHOWCASE_FLAG]) return;
+  const state = projectStore.snapshot();
+  if (!state) return;
+  const alreadyThere = Object.values(state.projects).some((p) => p.topic === SHOWCASE_TOPIC);
+  if (!alreadyThere && !projectStore.insert(showcaseProject())) return;
+  void supabase.auth.updateUser({ data: { [SHOWCASE_FLAG]: true } });
 }

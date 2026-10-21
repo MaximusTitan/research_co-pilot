@@ -48,7 +48,7 @@ export function ArrangementPreview({ current, proposed, onApply, onDiscard }: { 
   const changes = moves > 0 || newSections > 0 || keyPoints;
 
   return (
-    <Card as="section" label={t.arrange.previewTitle} className="border-2 border-[var(--accent)]">
+    <Card as="section" label={t.arrange.previewTitle} className="fade-up border-2 border-[var(--accent)] shadow-[var(--shadow-lg)]">
       <h2 className="font-semibold">✨ {t.arrange.previewTitle}</h2>
       <p className="mb-3 text-sm text-[var(--ink-muted)]">{changes ? `${t.arrange.previewHelp} ${t.arrange.moved(moves)}` : t.arrange.noChange}</p>
       {changes ? (

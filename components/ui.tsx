@@ -8,11 +8,15 @@ import { useT } from "../lib/i18n";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] border-transparent",
-  secondary: "bg-[var(--surface)] text-[var(--ink)] border-[var(--line-strong)] hover:bg-[var(--surface-2)]",
+  primary: "bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-[var(--accent-hover)] border-transparent shadow-[var(--shadow-sm)]",
+  secondary: "bg-[var(--surface)] text-[var(--ink)] border-[var(--line-strong)] hover:bg-[var(--surface-2)] hover:border-[var(--ink-muted)] shadow-[var(--shadow-sm)]",
   ghost: "bg-transparent text-[var(--ink)] border-transparent hover:bg-[var(--surface-2)]",
-  danger: "bg-[var(--danger)] text-white border-transparent hover:opacity-90",
+  danger: "bg-[var(--danger)] text-white border-transparent hover:opacity-90 shadow-[var(--shadow-sm)]",
 };
+
+/** Shared by buttons and button-styled links: colour changes fade, and a press gives a slight squeeze. */
+const BUTTON_BASE =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 font-medium transition-[color,background-color,border-color,opacity,scale] duration-150 ease-out select-none active:scale-[0.96] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 
 export function Button({
   variant = "secondary",
@@ -23,7 +27,7 @@ export function Button({
     <button
       type="button"
       {...props}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 font-medium transition-colors focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
+      className={`${BUTTON_BASE} ${VARIANTS[variant]} ${className}`}
     />
   );
 }
@@ -32,7 +36,7 @@ export function LinkButton({ href, children, variant = "primary" }: { href: stri
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 font-medium focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] ${VARIANTS[variant]}`}
+      className={`${BUTTON_BASE} ${VARIANTS[variant]}`}
     >
       {children}
     </Link>
@@ -41,7 +45,7 @@ export function LinkButton({ href, children, variant = "primary" }: { href: stri
 
 export function Card({ children, className = "", as: Tag = "section", label }: { children: ReactNode; className?: string; as?: "section" | "div" | "article"; label?: string }) {
   return (
-    <Tag aria-label={label} className={`rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm ${className}`}>
+    <Tag aria-label={label} className={`rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] ${className}`}>
       {children}
     </Tag>
   );
@@ -60,7 +64,7 @@ export function Field({ label, children, help, id }: { label: string; children: 
 }
 
 export const inputClass =
-  "min-h-11 w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] px-3 py-2 text-[var(--ink)] placeholder:text-[var(--ink-muted)] focus-visible:outline-3 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]";
+  "min-h-11 w-full rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] px-3 py-2 text-[var(--ink)] transition-[border-color,box-shadow] duration-150 placeholder:text-[var(--ink-muted)] hover:border-[var(--ink-muted)] focus-visible:border-[var(--accent)] focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] focus-visible:outline-3 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]";
 
 const TRUST_STYLE: Record<Trust, string> = {
   trusted: "bg-[var(--ok-bg)] text-[var(--ok-ink)] before:bg-[var(--ok)]",
@@ -78,32 +82,58 @@ export function TrustBadge({ trust }: { trust: Trust }) {
   );
 }
 
+const NOTICE_STYLE = {
+  info: { box: "bg-[var(--accent-soft)] border-[var(--accent)]", icon: "text-[var(--accent-ink)]" },
+  warn: { box: "bg-[var(--warn-bg)] border-[var(--warn)]", icon: "text-[var(--warn-ink)]" },
+  error: { box: "bg-[var(--danger-bg)] border-[var(--danger)]", icon: "text-[var(--danger-ink)]" },
+};
+
+/** A message box. Each tone has its own icon as well as its colour, so it reads without colour too. */
 export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "error"; children: ReactNode }) {
-  const style = {
-    info: "bg-[var(--accent-soft)] border-[var(--accent)]",
-    warn: "bg-[var(--warn-bg)] border-[var(--warn)]",
-    error: "bg-[var(--danger-bg)] border-[var(--danger)]",
-  }[tone];
+  const style = NOTICE_STYLE[tone];
   return (
-    <div role={tone === "error" ? "alert" : "status"} className={`rounded-lg border-l-4 px-4 py-3 text-[var(--ink)] ${style}`}>
-      {children}
+    <div role={tone === "error" ? "alert" : "status"} className={`fade-up flex gap-3 rounded-xl border-l-4 px-4 py-3 text-[var(--ink)] ${style.box}`}>
+      <NoticeIcon tone={tone} className={`mt-[0.2em] size-[1.1em] shrink-0 ${style.icon}`} />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
 
-export function Spinner({ label }: { label: string }) {
+function NoticeIcon({ tone, className }: { tone: "info" | "warn" | "error"; className: string }) {
+  const common = { className, viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+  if (tone === "warn") {
+    return (
+      <svg {...common}>
+        <path d="M10 3 2.5 16.5h15L10 3Z" />
+        <path d="M10 8.5v3.5M10 14.5v.01" />
+      </svg>
+    );
+  }
   return (
-    <p role="status" className="flex items-center gap-2 text-[var(--ink-muted)]">
-      <span aria-hidden className="inline-block size-4 animate-spin rounded-full border-2 border-[var(--line-strong)] border-t-[var(--accent)] motion-reduce:animate-none" />
-      {label}
-    </p>
+    <svg {...common}>
+      <circle cx="10" cy="10" r="7.5" />
+      {tone === "error" ? <path d="m7.5 7.5 5 5m0-5-5 5" /> : <path d="M10 9v4.5M10 6.5v.01" />}
+    </svg>
   );
 }
 
-export function PageTitle({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+/** Inside a button it takes the button's text colour, so it stays readable on a filled button. */
+export function Spinner({ label }: { label: string }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{children}</h1>
+    <span role="status" className="flex items-center gap-2 text-[var(--ink-muted)] [button_&]:text-current">
+      <span aria-hidden className="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent opacity-80 motion-reduce:animate-none" />
+      {label}
+    </span>
+  );
+}
+
+export function PageTitle({ children, actions, subtitle }: { children: ReactNode; actions?: ReactNode; subtitle?: ReactNode }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{children}</h1>
+        {subtitle ? <p className="mt-1 text-[var(--ink-muted)]">{subtitle}</p> : null}
+      </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </div>
   );

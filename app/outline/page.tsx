@@ -80,8 +80,9 @@ function Outline({ project }: { project: Project }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle actions={<LinkButton href="/write">{t.outline.startWriting} →</LinkButton>}>{t.outline.title}</PageTitle>
-      <p className="-mt-4 text-[var(--ink-muted)]">{t.outline.subtitle}</p>
+      <PageTitle actions={<LinkButton href="/write">{t.outline.startWriting} →</LinkButton>} subtitle={t.outline.subtitle}>
+        {t.outline.title}
+      </PageTitle>
       {arrangement.suggestion ? (
         <ArrangementPreview
           current={project}
@@ -99,7 +100,7 @@ function Outline({ project }: { project: Project }) {
             const isBody = s.kind === "body";
             const bodyIndex = project.sections.filter((x) => x.kind === "body").findIndex((x) => x.id === s.id);
             return (
-              <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3">
+              <li key={s.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 shadow-[var(--shadow-sm)]">
                 <span aria-hidden className="grid size-9 place-items-center rounded-lg bg-[var(--accent-soft)] font-bold">
                   {s.kind === "intro" ? t.outline.introShort : s.kind === "conclusion" ? t.outline.endShort : bodyIndex + 1}
                 </span>
@@ -117,12 +118,7 @@ function Outline({ project }: { project: Project }) {
                 ) : (
                   <p className="min-w-40 flex-1 font-semibold">{sectionLabel(s)}</p>
                 )}
-                {s.keyPoint ? (
-                  <p className="basis-full pl-12 text-sm text-[var(--ink-muted)]">
-                    <span className="font-semibold">{t.outline.keyPoint}:</span> {s.keyPoint}
-                  </p>
-                ) : null}
-                <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-sm">
+                <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-sm tabular-nums">
                   {count === 0 ? t.outline.noNotes : t.outline.notesCount(count)}
                 </span>
                 {isBody ? (
@@ -146,6 +142,11 @@ function Outline({ project }: { project: Project }) {
                       ↓
                     </Button>
                   </div>
+                ) : null}
+                {s.keyPoint ? (
+                  <p className="basis-full pl-12 text-sm text-[var(--ink-muted)]">
+                    <span className="font-semibold">{t.outline.keyPoint}:</span> {s.keyPoint}
+                  </p>
                 ) : null}
               </li>
             );
@@ -200,7 +201,7 @@ function Outline({ project }: { project: Project }) {
             {offline ? <div className="mt-3"><Notice tone="warn">{t.common.offlineHint}</Notice></div> : null}
             {error ? <div className="mt-3"><Notice tone="error">{error}</Notice></div> : null}
             {gaps ? (
-              <ul className="mt-3 flex flex-col gap-3">
+              <ul className="fade-up mt-3 flex flex-col gap-3">
                 {gaps.map((g) => (
                   <li key={g.question} className="rounded-lg border border-[var(--line)] p-3">
                     <p className="font-semibold">{g.question}</p>

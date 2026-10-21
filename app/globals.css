@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Use the Geist fonts loaded in app/layout.tsx. */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 /*
  * Colour tokens. Light is the default; dark follows the OS unless the user picks
  * light explicitly. High contrast and colour-blind palettes are data-attributes
@@ -29,6 +35,10 @@
   --danger-bg: #ffe3e3;
   --danger-ink: #862020;
   --highlight: #fff3bf;
+  /* Layered, low-opacity shadows: elevation without heavy outlines. */
+  --shadow-sm: 0 1px 2px rgb(27 31 42 / 0.06), 0 1px 1px rgb(27 31 42 / 0.04);
+  --shadow-md: 0 1px 2px rgb(27 31 42 / 0.06), 0 4px 12px -2px rgb(27 31 42 / 0.08);
+  --shadow-lg: 0 2px 4px rgb(27 31 42 / 0.06), 0 12px 32px -8px rgb(27 31 42 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,6 +66,9 @@
     --danger-bg: #421c1c;
     --danger-ink: #ffc9c9;
     --highlight: #5c4d10;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -2px rgb(0 0 0 / 0.35);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 12px 32px -8px rgb(0 0 0 / 0.5);
   }
 }
 
@@ -83,6 +96,9 @@
   --danger-bg: #421c1c;
   --danger-ink: #ffc9c9;
   --highlight: #5c4d10;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 12px 32px -8px rgb(0 0 0 / 0.5);
 }
 
 /* High contrast: stronger borders and text. */
@@ -128,7 +144,14 @@ body {
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+h1, h2, h3 { text-wrap: balance; }
+p, li, blockquote { text-wrap: pretty; }
+
+::selection { background: var(--accent-soft); color: var(--ink); }
 
 :root[data-font="readable"] body {
   font-family: Verdana, Tahoma, "Segoe UI", sans-serif;
@@ -184,8 +207,16 @@ body {
   to { opacity: 1; transform: none; }
 }
 .rise-in { animation: rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* A short, soft entrance for panels that appear after an action (AI previews, results). */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 0.25s ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .rise-in { animation: none; }
+  .rise-in, .fade-up { animation: none; }
 }
 
 mark.key {
@@ -196,9 +227,17 @@ mark.key {
 }
 
 @media print {
+  @page { margin: 2.2cm; }
   header, nav, button, .no-print { display: none !important; }
   body { background: #fff; color: #000; }
   .logo-on-light { display: block !important; }
   .logo-on-dark { display: none !important; }
-  main { max-width: none; padding: 0; }
+  main { max-width: none !important; padding: 0 !important; }
+
+  /* The printed paper: plain, serif and black on white, like a handed-in assignment. */
+  .paper { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.7; color: #000; }
+  .paper h1 { font-size: 20pt; font-weight: 700; text-align: center; margin: 0 0 1.4em; }
+  .paper h2 { font-size: 14pt; font-weight: 700; margin: 1.4em 0 0.5em; break-after: avoid; }
+  .paper p { margin: 0 0 0.8em; white-space: pre-wrap; orphans: 3; widows: 3; }
+  .paper .references p { padding-left: 2em; text-indent: -2em; }
 }

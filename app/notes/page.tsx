@@ -87,27 +87,37 @@ function Notes({ project }: { project: Project }) {
         </Notice>
       ) : null}
 
-      <form
-        className="grid gap-3 sm:grid-cols-[1fr_auto]"
-        onSubmit={(e) => {
-          e.preventDefault();
-          projectStore.update((p) => addNote(p, newNote, null));
-          setNewNote("");
-        }}
-      >
-        <Field id="new-note" label={t.notes.addNote}>
-          <input id="new-note" className={inputClass} value={newNote} maxLength={1000} placeholder={t.notes.newNotePlaceholder} onChange={(e) => setNewNote(e.target.value)} />
-        </Field>
-        <div className="flex items-end">
-          <Button type="submit" disabled={!newNote.trim()}>+ {t.notes.addNote}</Button>
-        </div>
-      </form>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              projectStore.update((p) => addNote(p, newNote, null));
+              setNewNote("");
+            }}
+          >
+            <label htmlFor="new-note" className="sr-only">{t.notes.addNote}</label>
+            <input id="new-note" className={inputClass} value={newNote} maxLength={1000} placeholder={t.notes.newNotePlaceholder} onChange={(e) => setNewNote(e.target.value)} />
+            <Button type="submit" disabled={!newNote.trim()} className="shrink-0">+ {t.notes.addNote}</Button>
+          </form>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Card as="section" label={t.notes.unsorted(unsorted.length)} className={unsorted.length ? "border-2 border-dashed border-[var(--accent)]" : "border-dashed shadow-none"}>
+            <h2 className="mb-1 font-semibold tabular-nums">{t.notes.unsorted(unsorted.length)}</h2>
+            <p className="mb-3 text-sm text-[var(--ink-muted)]">{t.notes.dragHint}</p>
+            {project.notes.length === 0 ? <p className="text-[var(--ink-muted)]">{t.notes.empty}</p> : <NoteList notes={unsorted} project={project} sourceTitle={sourceTitle} />}
+          </Card>
+        </aside>
+
+        <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
         {project.sections.map((section) => (
           <Card as="section" key={section.id} label={section.title} className="flex flex-col gap-3 bg-[var(--surface-2)]">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-bold">{section.title}</h2>
+              <h2 className="font-bold">
+                {section.kind === "intro" ? t.outline.intro : section.kind === "conclusion" ? t.outline.conclusion : section.title}
+                <span className="ml-2 text-sm font-normal text-[var(--ink-muted)] tabular-nums">{notesFor(project, section.id).length}</span>
+              </h2>
               {section.kind === "body" ? (
                 <Button variant="ghost" className="min-h-9 px-2 text-sm" aria-label={`${t.notes.removeTheme}: ${section.title}`} onClick={() => projectStore.update((p) => removeSection(p, section.id))}>
                   ✕
@@ -118,13 +128,6 @@ function Notes({ project }: { project: Project }) {
           </Card>
         ))}
       </div>
-
-      <Card as="section" label={t.notes.unsorted(unsorted.length)} className="border-dashed">
-        <h2 className="mb-2 font-semibold">{t.notes.unsorted(unsorted.length)}</h2>
-        <p className="mb-3 text-sm text-[var(--ink-muted)]">{t.notes.dragHint}</p>
-        <NoteList notes={unsorted} project={project} sourceTitle={sourceTitle} />
-        {project.notes.length === 0 ? <p className="text-[var(--ink-muted)]">{t.notes.empty}</p> : null}
-      </Card>
 
       <form
         className="grid gap-3 sm:grid-cols-[1fr_auto]"
@@ -141,6 +144,8 @@ function Notes({ project }: { project: Project }) {
           <Button type="submit" disabled={!newTheme.trim()}>+ {t.notes.addTheme}</Button>
         </div>
       </form>
+        </div>
+      </div>
     </div>
   );
 }
