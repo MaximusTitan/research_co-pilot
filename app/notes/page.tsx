@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Button, Card, Field, LinkButton, Notice, PageTitle, Spinner, inputClass } from "../../components/ui";
 import { RequireProject } from "../../components/shell";
 import { ReadAloud } from "../../components/read-aloud";
+import { ArrangementPreview, UndoArrangement, useArrangement } from "../../components/arrangement-preview";
 import { callAgent } from "../../lib/client/agent";
 import { useLocale, useT } from "../../lib/i18n";
-import { addNote, addSection, deleteNote, ensureSection, moveNote, notesFor, removeSection } from "../../lib/project";
+import { addNote, addSection, applySort, deleteNote, moveNote, notesFor, removeSection } from "../../lib/project";
 import { projectStore } from "../../lib/store";
 import type { Note, Project } from "../../lib/types";
 
@@ -23,6 +24,7 @@ function Notes({ project }: { project: Project }) {
   const [contradictions, setContradictions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+  const arrangement = useArrangement();
 
   const bodySections = project.sections.filter((s) => s.kind === "body");
   const unsorted = notesFor(project, null);
@@ -44,15 +46,8 @@ function Notes({ project }: { project: Project }) {
     }
     setOffline(result.mode === "offline");
     setContradictions(result.data.contradictions.map((c) => c.explanation));
-    projectStore.update((p) => {
-      let next = p;
-      for (const a of result.data.assignments) {
-        if (!p.notes.some((n) => n.id === a.noteId)) continue;
-        const ensured = ensureSection(next, a.section);
-        next = moveNote(ensured.project, a.noteId, ensured.sectionId || null);
-      }
-      return next;
-    });
+    const { assignments } = result.data;
+    arrangement.propose((p) => applySort(p, assignments));
   }
 
   return (
@@ -60,7 +55,7 @@ function Notes({ project }: { project: Project }) {
       <PageTitle
         actions={
           <>
-            <Button onClick={sort} disabled={sorting || project.notes.length === 0}>
+            <Button onClick={sort} disabled={sorting || arrangement.suggestion !== null || project.notes.length === 0}>
               {sorting ? <Spinner label={t.notes.sorting} /> : `✨ ${t.notes.sort}`}
             </Button>
             <LinkButton href="/outline">{t.notes.outline} →</LinkButton>
@@ -72,6 +67,15 @@ function Notes({ project }: { project: Project }) {
 
       {offline ? <Notice tone="warn">{t.common.offlineHint}</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {arrangement.suggestion ? (
+        <ArrangementPreview
+          current={project}
+          proposed={arrangement.suggestion(project)}
+          onApply={() => arrangement.apply(project)}
+          onDiscard={arrangement.discard}
+        />
+      ) : null}
+      {arrangement.canUndo ? <UndoArrangement onUndo={arrangement.undo} /> : null}
       {contradictions.length > 0 ? (
         <Notice tone="warn">
           <p className="mb-1 font-semibold">{t.notes.contradictions}</p>

@@ -8,7 +8,7 @@ import { formatCitation } from "../../lib/citations";
 import { callAgent } from "../../lib/client/agent";
 import { useFlash } from "../../lib/client/hooks";
 import { useLocale, useT } from "../../lib/i18n";
-import { addDocumentSource, addNote, addSources, toggleMarked, toggleSaved } from "../../lib/project";
+import { addDocumentSource, addSourceNote, addSources, needsSearch, toggleMarked, toggleSaved } from "../../lib/project";
 import { safeHttpUrl } from "../../lib/credibility";
 import { projectStore } from "../../lib/store";
 import { documentSource, filterSources, toSource, type SourceFilter } from "../../lib/sources";
@@ -45,16 +45,17 @@ function Sources({ project }: { project: Project }) {
     setOffline(result.mode === "offline");
     setPage(nextPage);
     const found = result.data.sources.map(toSource);
-    projectStore.update((p) => addSources(p, found));
+    projectStore.update((p) => ({ ...addSources(p, found), searchedFor: question }));
   }
 
   const startSearch = useEffectEvent(() => search(1));
-  // Look for sources the first time this screen opens for a question.
+  // Look for sources the first time this screen opens for a question, and again after the question changes.
+  const stale = needsSearch(project);
   useEffect(() => {
-    if (started.current || project.sources.length > 0) return;
+    if (started.current || !stale) return;
     started.current = true;
     void startSearch();
-  }, [project.sources.length]);
+  }, [stale]);
 
   const visible = filterSources(project.sources, filter);
   const selected: Source | undefined = project.sources.find((s) => s.id === selectedId) ?? visible[0];
@@ -84,7 +85,7 @@ function Sources({ project }: { project: Project }) {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label={t.sources.title} className="flex min-w-0 flex-col gap-3">
-          {loading && project.sources.length === 0 ? <Spinner label={t.sources.searching} /> : null}
+          {loading && stale ? <Spinner label={t.sources.searching} /> : null}
           {!loading && visible.length === 0 ? <p className="text-[var(--ink-muted)]">{t.sources.none}</p> : null}
           <ul className="flex flex-col gap-3">
             {visible.map((s) => {
@@ -134,7 +135,7 @@ function Sources({ project }: { project: Project }) {
           </ul>
           <div>
             <Button onClick={() => search(page + 1)} disabled={loading}>
-              {loading && project.sources.length > 0 ? <Spinner label={t.sources.searching} /> : t.sources.searchAgain}
+              {loading && !stale ? <Spinner label={t.sources.searching} /> : t.sources.searchAgain}
             </Button>
           </div>
         </section>
@@ -194,7 +195,7 @@ function Reader({ source }: { source: Source }) {
         <Button
           variant="primary"
           onClick={() => {
-            projectStore.update((p) => addNote(p, source.keyQuote ?? source.summary, source.id));
+            projectStore.update((p) => addSourceNote(p, source));
             flashAdded();
           }}
         >

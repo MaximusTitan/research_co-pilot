@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, LinkButton, Notice, PageTitle, Spinner, inputClass } from "../../components/ui";
 import { RequireProject } from "../../components/shell";
+import { ArrangementPreview, UndoArrangement, useArrangement } from "../../components/arrangement-preview";
 import { callAgent } from "../../lib/client/agent";
 import { useLocale, useT } from "../../lib/i18n";
 import { addSection, applyOutline, moveSection, notesFor, renameSection } from "../../lib/project";
@@ -25,6 +26,7 @@ function Outline({ project }: { project: Project }) {
   const [building, setBuilding] = useState(false);
   const [outlineError, setOutlineError] = useState<string | null>(null);
   const [outlineOffline, setOutlineOffline] = useState(false);
+  const arrangement = useArrangement();
 
   const emptyBody = project.sections.find((s) => s.kind === "body" && notesFor(project, s.id).length === 0);
 
@@ -66,7 +68,8 @@ function Outline({ project }: { project: Project }) {
       return;
     }
     setOutlineOffline(result.mode === "offline");
-    projectStore.update((p) => applyOutline(p, result.data.sections));
+    const { sections } = result.data;
+    arrangement.propose((p) => applyOutline(p, sections));
   }
 
   function sectionLabel(s: Section) {
@@ -79,6 +82,15 @@ function Outline({ project }: { project: Project }) {
     <div className="flex flex-col gap-6">
       <PageTitle actions={<LinkButton href="/write">{t.outline.startWriting} →</LinkButton>}>{t.outline.title}</PageTitle>
       <p className="-mt-4 text-[var(--ink-muted)]">{t.outline.subtitle}</p>
+      {arrangement.suggestion ? (
+        <ArrangementPreview
+          current={project}
+          proposed={arrangement.suggestion(project)}
+          onApply={() => arrangement.apply(project)}
+          onDiscard={arrangement.discard}
+        />
+      ) : null}
+      {arrangement.canUndo ? <UndoArrangement onUndo={arrangement.undo} /> : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <ol className="flex flex-col gap-3" aria-label={t.outline.title}>
@@ -144,7 +156,7 @@ function Outline({ project }: { project: Project }) {
           <Card as="section" label={t.outline.aiOutline} className="bg-[var(--accent-soft)]">
             <h2 className="font-semibold">✨ {t.outline.aiOutline}</h2>
             <p className="mb-3 text-sm">{project.notes.length ? t.outline.aiOutlineHelp : t.outline.needNotes}</p>
-            <Button variant="primary" onClick={buildOutline} disabled={building || project.notes.length === 0}>
+            <Button variant="primary" onClick={buildOutline} disabled={building || arrangement.suggestion !== null || project.notes.length === 0}>
               {building ? <Spinner label={t.outline.aiOutlining} /> : t.outline.aiOutline}
             </Button>
             {outlineOffline ? <div className="mt-3"><Notice tone="warn">{t.common.offlineHint}</Notice></div> : null}

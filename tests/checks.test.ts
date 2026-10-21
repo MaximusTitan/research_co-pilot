@@ -40,21 +40,28 @@ describe("checkGrammar", () => {
 });
 
 describe("checkOriginality", () => {
+  const quoted: Source = { ...source, keyQuote: source.summary };
+
   it("flags sentences copied word-for-word from a source", () => {
     const copied = "Pesticide exposure reduces the foraging success of honey bees in field trials across three regions.";
-    const result = checkOriginality(copied, [source], []);
+    const result = checkOriginality(copied, [quoted]);
     expect(result.flagged).toHaveLength(1);
     expect(result.score).toBe(0);
   });
 
   it("accepts quoted and cited text", () => {
-    const quoted = '"Pesticide exposure reduces the foraging success of honey bees in field trials" [1].';
-    expect(checkOriginality(quoted, [source], []).flagged).toHaveLength(0);
+    const text = '"Pesticide exposure reduces the foraging success of honey bees in field trials" [1].';
+    expect(checkOriginality(text, [quoted]).flagged).toHaveLength(0);
   });
 
   it("passes writing in the student's own words", () => {
     const own = "My grandmother noticed fewer bees in her garden last summer, which made me curious about why.";
-    expect(checkOriginality(own, [source], []).score).toBe(100);
+    expect(checkOriginality(own, [quoted]).score).toBe(100);
+  });
+
+  it("does not count matching the AI's summary as copying the source", () => {
+    const fromSummary = "Pesticide exposure reduces the foraging success of honey bees in field trials across three regions.";
+    expect(checkOriginality(fromSummary, [source]).score).toBe(100);
   });
 });
 

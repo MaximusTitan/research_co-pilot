@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { addDocumentSource, addNote, addSection, createProject, moveSection, removeSection, toggleSaved } from "../lib/project";
-import type { Source } from "../lib/types";
+import {
+  addDocumentSource,
+  addNote,
+  addSection,
+  addSourceNote,
+  applySort,
+  arrangementOf,
+  createProject,
+  moveSection,
+  needsSearch,
+  removeSection,
+  restoreArrangement,
+  resumePath,
+  saveNoteSources,
+  setDraft,
+  setQuestion,
+  toggleSaved,
+} from "../lib/project";
+import type { Project, Source } from "../lib/types";
 
 const input = {
   topic: "Why are bees disappearing?",
@@ -28,6 +45,73 @@ function src(id: string, title: string): Source {
     marked: false,
   };
 }
+
+describe("notes from sources", () => {
+  it("saves the source when one of its facts is added to notes, so drafts can cite it", () => {
+    let p = createProject(input);
+    p = { ...p, sources: [{ ...src("a", "A"), summary: "Bees pollinate crops." }] };
+    p = addSourceNote(p, p.sources[0]);
+    expect(p.notes[0]).toMatchObject({ text: "Bees pollinate crops.", sourceId: "a" });
+    expect(p.sources[0]).toMatchObject({ saved: true, ref: 1 });
+  });
+
+  it("saves sources behind older notes before drafting", () => {
+    let p = createProject(input);
+    p = addNote({ ...p, sources: [src("a", "A")] }, "Fact", "a");
+    expect(saveNoteSources(p).sources[0].ref).toBe(1);
+    const saved = saveNoteSources(p);
+    expect(saveNoteSources(saved)).toBe(saved);
+  });
+});
+
+describe("changing the question", () => {
+  it("asks for a new search and drops sources the student never used", () => {
+    let p: Project = { ...createProject(input), question: "Old?", searchedFor: "Old?" };
+    p = { ...p, sources: [src("unused", "U"), { ...src("kept", "K"), saved: true, ref: 1 }, src("noted", "N")] };
+    p = addNote(p, "Fact", "noted");
+    expect(needsSearch(p)).toBe(false);
+    const next = setQuestion(p, "New?", null);
+    expect(needsSearch(next)).toBe(true);
+    expect(next.sources.map((s) => s.id)).toEqual(["kept", "noted"]);
+    expect(needsSearch({ ...next, searchedFor: "New?" })).toBe(false);
+  });
+
+  it("keeps everything when the same question is picked again", () => {
+    const p = { ...createProject(input), question: "Same?", sources: [src("a", "A")] };
+    expect(setQuestion(p, "Same?", null).sources).toHaveLength(1);
+    expect(needsSearch(setQuestion(p, "Same?", null))).toBe(false);
+  });
+
+  it("searches again for older projects that never recorded what they searched for", () => {
+    const p = { ...createProject(input), question: "Old?", sources: [src("a", "A")] };
+    expect(needsSearch(p)).toBe(false);
+    expect(needsSearch(setQuestion(p, "New?", null))).toBe(true);
+  });
+});
+
+describe("undoing an AI sort", () => {
+  it("restores sections and note placement but keeps writing done since", () => {
+    let p = addNote(createProject(input), "Fact", null);
+    const before = arrangementOf(p);
+    p = applySort(p, [{ noteId: p.notes[0].id, section: "Habitat" }]);
+    expect(p.sections).toHaveLength(3);
+    p = setDraft(p, p.sections[0].id, "My intro");
+    p = addNote(p, "Later note", null);
+    const undone = restoreArrangement(p, before);
+    expect(undone.sections.map((s) => s.kind)).toEqual(["intro", "conclusion"]);
+    expect(undone.sections[0].draft).toBe("My intro");
+    expect(undone.notes.map((n) => n.sectionId)).toEqual([null, null]);
+  });
+});
+
+describe("resuming a project", () => {
+  it("opens on the last step, or Refine if none is known", () => {
+    const p = createProject(input);
+    expect(resumePath(p)).toBe("/refine");
+    expect(resumePath({ ...p, lastStep: "/write" })).toBe("/write");
+    expect(resumePath({ ...p, lastStep: "/elsewhere" })).toBe("/refine");
+  });
+});
 
 describe("project model", () => {
   it("starts with an intro and a conclusion", () => {

@@ -50,6 +50,8 @@ function rememberCurrent(id: string | null) {
 function write(next: StoreState, changed: string[] = []) {
   cache = next;
   changed.forEach((id) => dirty.add(id));
+  // Unsaved changes count as saving, so nothing claims "Saved" before the database has them.
+  if (changed.length && userId) saveStatus = "saving";
   notify();
   if (changed.length) scheduleSave();
 }
@@ -185,13 +187,14 @@ export const projectStore = {
       .then(() => deleteProject(supabaseBrowser(), id))
       .catch(() => setStatus("error"));
   },
-  /** Applies a pure update to the current project. */
-  update(fn: (p: Project) => Project) {
+  /** Applies a pure update to the current project. `touch: false` keeps its "last updated" time, for bookkeeping like the current step. */
+  update(fn: (p: Project) => Project, { touch = true }: { touch?: boolean } = {}) {
     const current = cache?.currentId ? cache.projects[cache.currentId] : null;
     if (!cache || !current) return;
     const next = fn(current);
     if (next === current) return;
-    write({ ...cache, projects: { ...cache.projects, [current.id]: { ...next, updatedAt: Date.now() } } }, [current.id]);
+    const updatedAt = touch ? Date.now() : current.updatedAt;
+    write({ ...cache, projects: { ...cache.projects, [current.id]: { ...next, updatedAt } } }, [current.id]);
   },
   /** Retries after an error: reloads if loading failed, otherwise re-sends unsaved changes. */
   retry() {

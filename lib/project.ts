@@ -57,6 +57,36 @@ export function addDocumentSource(p: Project, source: Source, findings: string[]
   return { ...p, nextRef: p.nextRef + 1, sources: [...p.sources, saved], notes: [...p.notes, ...notes] };
 }
 
+/** Saves a source if it isn't already, giving it a citation number. */
+export function saveSource(p: Project, sourceId: string): Project {
+  const source = p.sources.find((s) => s.id === sourceId);
+  return !source || source.saved ? p : toggleSaved(p, sourceId);
+}
+
+/** Every source a note came from must be saved, or drafts written from those notes can't cite it. */
+export function saveNoteSources(p: Project): Project {
+  return p.notes.reduce((next, n) => (n.sourceId ? saveSource(next, n.sourceId) : next), p);
+}
+
+/** Drops the sources found for the old question that the student never used, so a new search can replace them. */
+export function setQuestion(p: Project, question: string, angleId: string | null): Project {
+  if (question === p.question) return { ...p, selectedAngleId: angleId };
+  const used = new Set(p.notes.map((n) => n.sourceId));
+  return {
+    ...p,
+    selectedAngleId: angleId,
+    question,
+    searchedFor: p.searchedFor ?? p.question ?? p.topic,
+    sources: p.sources.filter((s) => s.saved || s.marked || used.has(s.id)),
+  };
+}
+
+/** True when there are no sources yet, or they were found for a different question. */
+export function needsSearch(p: Project): boolean {
+  if (p.sources.length === 0) return true;
+  return p.searchedFor !== undefined && p.searchedFor !== (p.question ?? p.topic);
+}
+
 export function toggleSaved(p: Project, sourceId: string): Project {
   let nextRef = p.nextRef;
   const sources = p.sources.map((s) => {
@@ -83,6 +113,12 @@ export function addNote(p: Project, text: string, sourceId: string | null, secti
   const note: Note = { id: newId(), text: text.trim(), sourceId, sectionId };
   if (!note.text) return p;
   return { ...p, notes: [...p.notes, note] };
+}
+
+/** Takes a note from a source and saves that source, so the note can be cited later. */
+export function addSourceNote(p: Project, source: Source): Project {
+  const next = addNote(p, source.keyQuote ?? source.summary, source.id);
+  return next === p ? p : saveSource(next, source.id);
 }
 
 export function updateNote(p: Project, noteId: string, text: string): Project {
@@ -184,6 +220,47 @@ export function applyOutline(p: Project, suggestions: OutlineSuggestion[]): Proj
     }
   }
   return next;
+}
+
+/** Applies the note sorter's suggestions: each note goes into the named section, created if needed. */
+export function applySort(p: Project, assignments: { noteId: string; section: string }[]): Project {
+  let next = p;
+  for (const a of assignments) {
+    if (!p.notes.some((n) => n.id === a.noteId)) continue;
+    const ensured = ensureSection(next, a.section);
+    next = moveNote(ensured.project, a.noteId, ensured.sectionId || null);
+  }
+  return next;
+}
+
+/** How notes and sections are laid out, kept so an AI sort or outline can be undone. */
+export type Arrangement = Pick<Project, "sections" | "notes">;
+
+export function arrangementOf(p: Project): Arrangement {
+  return { sections: p.sections, notes: p.notes };
+}
+
+/**
+ * Puts sections and note placement back the way they were. Writing done since
+ * is kept: drafts carry over by section id and new or edited notes stay.
+ */
+export function restoreArrangement(p: Project, before: Arrangement): Project {
+  const drafts = new Map(p.sections.map((s) => [s.id, s.draft]));
+  const placed = new Map(before.notes.map((n) => [n.id, n.sectionId]));
+  const sections = before.sections.map((s) => ({ ...s, draft: drafts.get(s.id) ?? s.draft }));
+  const ids = new Set(sections.map((s) => s.id));
+  const notes = p.notes.map((n) => {
+    const sectionId = placed.has(n.id) ? (placed.get(n.id) ?? null) : n.sectionId;
+    return { ...n, sectionId: sectionId && ids.has(sectionId) ? sectionId : null };
+  });
+  return { ...p, sections, notes };
+}
+
+export const STEP_PATHS = ["/refine", "/sources", "/notes", "/outline", "/write", "/review"] as const;
+
+/** Where to send the student when they reopen a project. */
+export function resumePath(p: Project): string {
+  return STEP_PATHS.find((s) => s === p.lastStep) ?? STEP_PATHS[0];
 }
 
 /** Replaces the first occurrence of a sentence in whichever section contains it. */

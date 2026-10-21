@@ -79,7 +79,7 @@ function Review({ project }: { project: Project }) {
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   const draft = fullDraft(project);
-  const originality = useMemo(() => checkOriginality(draft, project.sources, project.notes), [draft, project.sources, project.notes]);
+  const originality = useMemo(() => checkOriginality(draft, project.sources), [draft, project.sources]);
   const grammar = useMemo(
     () => project.sections.map((s) => ({ section: s, issues: checkGrammar(s.draft, project.grade) })),
     [project.sections, project.grade],

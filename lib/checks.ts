@@ -14,14 +14,15 @@ export interface OriginalityResult {
 const SHINGLE = 5;
 
 /**
- * Flags sentences that reuse long word runs from the student's sources or notes
- * without quotation marks. Quoted text is fine as long as it is cited.
+ * Flags sentences that reuse long word runs from a source's own wording without
+ * quotation marks. Quoted text is fine as long as it is cited. Summaries and
+ * notes are left out: they are the AI's or the student's words, not the
+ * source's, so matching them isn't copying the source.
  */
-export function checkOriginality(draft: string, sources: Source[], notes: Note[]): OriginalityResult {
-  const corpus = [
-    ...sources.map((s) => ({ id: s.id, text: `${s.summary} ${s.keyQuote ?? ""}` })),
-    ...notes.map((n) => ({ id: n.sourceId, text: n.text })),
-  ].map((c) => ({ id: c.id, set: shingles(c.text, SHINGLE) }));
+export function checkOriginality(draft: string, sources: Source[]): OriginalityResult {
+  const corpus = sources
+    .filter((s) => s.keyQuote)
+    .map((s) => ({ id: s.id, set: shingles(s.keyQuote ?? "", SHINGLE) }));
 
   const all = sentences(draft).filter((s) => words(s.text).length >= SHINGLE);
   const flagged: OriginalityResult["flagged"] = [];

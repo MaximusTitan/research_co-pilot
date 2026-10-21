@@ -5,12 +5,13 @@ import { Button, Card, LinkButton, Notice, PageTitle, Spinner } from "../../comp
 import { RequireProject } from "../../components/shell";
 import { callAgent } from "../../lib/client/agent";
 import { useLocale, useT } from "../../lib/i18n";
-import { fillIfEmpty, notesFor, savedSources, setDraft } from "../../lib/project";
-import { projectStore } from "../../lib/store";
+import { fillIfEmpty, notesFor, saveNoteSources, savedSources, setDraft } from "../../lib/project";
+import { projectStore, useSaveStatus } from "../../lib/store";
 import type { Project, Section, Source } from "../../lib/types";
 
 type Suggestion = { id: string; original: string; replacement: string; why: string };
 type Preview = { sectionId: string; text: string; offline: boolean };
+type BulkDraft = { sectionId: string; text: string };
 
 export default function WritePage() {
   return <RequireProject>{(project) => <Write project={project} />}</RequireProject>;
@@ -29,9 +30,12 @@ function Write({ project }: { project: Project }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
   const [bulkOffline, setBulkOffline] = useState(false);
+  const [bulkDrafts, setBulkDrafts] = useState<BulkDraft[]>([]);
+  const saveStatus = useSaveStatus();
 
   const section = project.sections.find((s) => s.id === activeId) ?? project.sections[0];
   const sources = savedSources(project);
+  const saveLabel = saveStatus === "error" ? `⚠ ${t.common.notSaved}` : saveStatus === "saving" ? t.common.saving : `${t.common.saved} ✓`;
   const words = section ? section.draft.trim().split(/\s+/).filter(Boolean).length : 0;
 
   function insertAtCursor(text: string) {
@@ -49,8 +53,16 @@ function Write({ project }: { project: Project }) {
     });
   }
 
+  /** Saves any source a note came from, so the draft can cite it, and returns the project to draft from. */
+  function withNoteSources(): Project {
+    const ready = saveNoteSources(project);
+    if (ready !== project) projectStore.update(saveNoteSources);
+    return ready;
+  }
+
   /** Everything the Writing Partner needs for one section: its notes, saved sources and the outline. */
-  function draftRequest(target: Section) {
+  function draftRequest(project: Project, target: Section) {
+    const sources = savedSources(project);
     const refOf = (sourceId: string | null) => sources.find((s) => s.id === sourceId)?.ref ?? null;
     return {
       question: (project.question ?? project.topic).slice(0, 500),
@@ -79,7 +91,7 @@ function Write({ project }: { project: Project }) {
       return;
     }
     setDrafting(true);
-    const result = await callAgent("draft", draftRequest(section));
+    const result = await callAgent("draft", draftRequest(withNoteSources(), section));
     setDrafting(false);
     if (!result.ok) {
       setError(t.common.agentError);
@@ -103,28 +115,46 @@ ${preview.text}` : preview.text;
     setPreview(null);
   }
 
+  /** Drafts every empty section into a preview; nothing goes into the paper until the student picks it. */
   async function draftAllEmpty() {
     setError(null);
     setMessage(null);
     setPreview(null);
     setBulkOffline(false);
+    setBulkDrafts([]);
     const targets = project.sections.filter((s) => !s.draft.trim() && canDraft(s));
     if (targets.length === 0) {
       setMessage(t.write.nothingToDraft);
       return;
     }
-    let filled = 0;
+    const ready = withNoteSources();
+    let drafted = 0;
     for (const [i, target] of targets.entries()) {
       setBulk({ done: i + 1, total: targets.length });
-      const result = await callAgent("draft", draftRequest(target));
-      if (!result.ok || !result.data.text.trim()) continue;
+      const result = await callAgent("draft", draftRequest(ready, target));
+      const text = result.ok ? result.data.text.trim() : "";
+      if (!result.ok || !text) continue;
       if (result.mode === "offline") setBulkOffline(true);
-      // Never overwrites: if the student typed in this section meanwhile, their text wins.
-      projectStore.update((p) => fillIfEmpty(p, target.id, result.data.text));
-      filled++;
+      setBulkDrafts((list) => [...list, { sectionId: target.id, text }]);
+      drafted++;
     }
     setBulk(null);
-    setMessage(t.write.draftAllDone(filled));
+    if (drafted === 0) setMessage(t.write.draftAllNone);
+  }
+
+  /** Puts one bulk draft in place. If the student has written there since, it goes after their text. */
+  function applyBulkDraft(item: BulkDraft) {
+    projectStore.update((p) => {
+      const target = p.sections.find((s) => s.id === item.sectionId);
+      if (!target) return p;
+      return target.draft.trim() ? setDraft(p, target.id, `${target.draft.trimEnd()}\n\n${item.text}`) : fillIfEmpty(p, target.id, item.text);
+    });
+    setBulkDrafts((list) => list.filter((x) => x.sectionId !== item.sectionId));
+  }
+
+  function applyAllBulkDrafts() {
+    bulkDrafts.forEach(applyBulkDraft);
+    setMessage(t.write.draftAllDone(bulkDrafts.length));
   }
 
   async function improve() {
@@ -161,8 +191,8 @@ ${preview.text}` : preview.text;
       <PageTitle
         actions={
           <>
-            <span className="self-center text-sm text-[var(--ink-muted)]" aria-live="polite">{t.common.saved} ✓</span>
-            <Button onClick={draftAllEmpty} disabled={bulk !== null || drafting}>
+            <span className={`self-center text-sm ${saveStatus === "error" ? "text-[var(--danger-ink)]" : "text-[var(--ink-muted)]"}`} aria-live="polite">{saveLabel}</span>
+            <Button onClick={draftAllEmpty} disabled={bulk !== null || drafting || bulkDrafts.length > 0}>
               {bulk ? <Spinner label={t.write.draftingAll(bulk.done, bulk.total)} /> : `✨ ${t.write.draftAll}`}
             </Button>
             <LinkButton href="/review">{t.write.review} →</LinkButton>
@@ -171,6 +201,38 @@ ${preview.text}` : preview.text;
       >
         {project.topic}
       </PageTitle>
+
+      {bulkDrafts.length > 0 ? (
+        <Card as="section" label={t.write.draftAllTitle} className="border-2 border-[var(--accent)]">
+          <h2 className="font-semibold">✨ {t.write.draftAllTitle}</h2>
+          <p className="mb-3 text-sm text-[var(--ink-muted)]">{t.write.draftWarning}</p>
+          {bulkOffline ? <div className="mb-3"><Notice tone="warn">{t.common.offlineHint}</Notice></div> : null}
+          <ul className="flex flex-col gap-3">
+            {bulkDrafts.map((item) => {
+              const target = project.sections.find((s) => s.id === item.sectionId);
+              if (!target) return null;
+              return (
+                <li key={item.sectionId} className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
+                  <p className="font-semibold">{sectionName(target, t)}</p>
+                  <p className="mt-1 whitespace-pre-wrap leading-relaxed">{item.text}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="primary" className="min-h-9" onClick={() => applyBulkDraft(item)}>
+                      {target.draft.trim() ? t.write.addToEnd : t.write.useDraft}
+                    </Button>
+                    <Button variant="ghost" className="min-h-9" onClick={() => setBulkDrafts((list) => list.filter((x) => x.sectionId !== item.sectionId))}>
+                      {t.write.discard}
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="primary" onClick={applyAllBulkDrafts}>{t.write.useAll}</Button>
+            <Button variant="ghost" onClick={() => setBulkDrafts([])}>{t.write.discardAll}</Button>
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_minmax(0,1.4fr)]">
         <nav aria-label={t.write.sections} className="min-w-0 lg:sticky lg:top-4 lg:self-start">
@@ -246,7 +308,6 @@ ${preview.text}` : preview.text;
               </div>
             </Card>
           ) : null}
-          {bulkOffline ? <Notice tone="warn">{t.common.offlineHint}</Notice> : null}
           {message ? <Notice>{message}</Notice> : null}
           {error ? <Notice tone="error">{error}</Notice> : null}
           {suggestions.length > 0 ? (

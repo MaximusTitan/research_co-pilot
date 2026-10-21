@@ -83,6 +83,10 @@ export interface Project {
   angles: Angle[];
   selectedAngleId: string | null;
   question: string | null;
+  /** The question the current sources were found for; a different question means it's time to search again. */
+  searchedFor?: string;
+  /** The step the student was last on, so reopening the project lands there. */
+  lastStep?: string;
   plan: string[];
   sources: Source[];
   nextRef: number;

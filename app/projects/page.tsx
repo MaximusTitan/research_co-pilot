@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Card, LinkButton, PageTitle } from "../../components/ui";
 import { useLocale, useT } from "../../lib/i18n";
+import { resumePath } from "../../lib/project";
 import { projectStore, useStore } from "../../lib/store";
 import type { Project } from "../../lib/types";
 
@@ -38,7 +39,7 @@ export default function ProjectsPage() {
                   variant="primary"
                   onClick={() => {
                     projectStore.select(p.id);
-                    router.push("/refine");
+                    router.push(resumePath(p));
                   }}
                 >
                   {t.projects.open}

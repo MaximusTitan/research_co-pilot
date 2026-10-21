@@ -7,6 +7,7 @@ import { RequireProject } from "../../components/shell";
 import { ReadAloud } from "../../components/read-aloud";
 import { callAgent } from "../../lib/client/agent";
 import { useLocale, useT } from "../../lib/i18n";
+import { setQuestion as applyQuestion } from "../../lib/project";
 import { projectStore } from "../../lib/store";
 import type { Angle, Project } from "../../lib/types";
 
@@ -50,7 +51,7 @@ function Refine({ project }: { project: Project }) {
 
   function useQuestion() {
     if (!chosen) return;
-    projectStore.update((p) => ({ ...p, selectedAngleId: angleId, question: chosen }));
+    projectStore.update((p) => applyQuestion(p, chosen, angleId));
     router.push("/sources");
   }
 

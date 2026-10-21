@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { STEP_PATHS } from "../lib/project";
 import { projectStore, useCurrentProject, useSaveStatus } from "../lib/store";
 import { useT } from "../lib/i18n";
 import { supabaseBrowser } from "../lib/supabase/client";
@@ -25,6 +26,13 @@ export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { project } = useCurrentProject();
   const user = useAuthUser();
+
+  // Remember the step the student is on so reopening the project comes back here.
+  const step = STEP_PATHS.find((s) => s === pathname);
+  const lastStep = project?.lastStep;
+  useEffect(() => {
+    if (step && lastStep !== step) projectStore.update((p) => ({ ...p, lastStep: step }), { touch: false });
+  }, [step, lastStep]);
 
   // The landing page brings its own header and footer.
   if (pathname === LANDING) return <>{children}</>;
