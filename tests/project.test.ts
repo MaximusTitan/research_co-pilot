@@ -107,9 +107,9 @@ describe("undoing an AI sort", () => {
 describe("resuming a project", () => {
   it("opens on the last step, or Refine if none is known", () => {
     const p = createProject(input);
-    expect(resumePath(p)).toBe("/refine");
+    expect(resumePath(p)).toBe("/generate");
     expect(resumePath({ ...p, lastStep: "/write" })).toBe("/write");
-    expect(resumePath({ ...p, lastStep: "/elsewhere" })).toBe("/refine");
+    expect(resumePath({ ...p, lastStep: "/elsewhere" })).toBe("/generate");
   });
 });
 

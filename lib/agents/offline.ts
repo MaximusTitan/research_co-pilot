@@ -321,3 +321,15 @@ export function offlineFeedback(input: AgentInput<"feedback">): AgentOutput<"fee
   ];
   return { overall: text.overall, strengths, improvements };
 }
+
+/** An abstract made of each section's opening sentence, with keywords from the research question. */
+export function offlineAbstract(input: AgentInput<"abstract">): AgentOutput<"abstract"> {
+  const openers = input.sections
+    .map((s) => sentences(s.text)[0]?.text.replace(/\s*\[[\d,\s]+\]/g, "") ?? "")
+    .filter(Boolean)
+    .slice(0, 5);
+  const counts = new Map<string, number>();
+  for (const k of keywords([input.question, ...input.sections.map((s) => s.text)].join(" "))) counts.set(k, (counts.get(k) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k);
+  return { abstract: openers.join(" "), keywords: top };
+}

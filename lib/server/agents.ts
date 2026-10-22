@@ -171,7 +171,24 @@ Do not rewrite the paper. Write for ${level(input.grade)}. Answer in ${lang(inpu
     );
     return ai;
   },
+
+  abstract: async (input) => {
+    const ai = await askClaude<typeof agents.abstract.output>(
+      `Role: Editor. Write the abstract for the student's finished ${input.writingType}, as it would appear at the top of a published research paper.
+In one paragraph of ${input.grade === "4-6" ? "60-90" : "120-180"} words, say what question the paper asks, how it was researched (from published sources), the main findings and the conclusion.
+Use only what the paper says: no new facts, numbers or claims, and no citations, headings or markdown. Also give 4-6 short keywords.
+Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
+      `Research question: <note>${tagSafe(input.question)}</note>\n${input.sections
+        .map((s) => `Section <note>${tagSafe(s.title)}</note>:\n<document>${tagSafe(s.text)}</document>`)
+        .join("\n")}`,
+      agents.abstract.output,
+    );
+    if (!ai) return null;
+    return { abstract: stripCitations(ai.abstract), keywords: ai.keywords.map((k) => k.trim()).filter(Boolean).slice(0, 6) };
+  },
 };
+
+const stripCitations = (text: string) => text.replace(/\s*\[[\d,\s]+\]/g, "").trim();
 
 const offlineRunners: { [A in AgentName]: (input: AgentInput<A>) => AgentOutput<A> } = {
   plan: offline.offlinePlan,
@@ -185,6 +202,7 @@ const offlineRunners: { [A in AgentName]: (input: AgentInput<A>) => AgentOutput<
   draft: offline.offlineDraft,
   fixClaim: offline.offlineFixClaim,
   feedback: offline.offlineFeedback,
+  abstract: offline.offlineAbstract,
 };
 
 export type AgentResult<A extends AgentName> = { mode: "ai" | "offline"; data: AgentOutput<A> } | { error: string };

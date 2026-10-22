@@ -256,7 +256,7 @@ export function restoreArrangement(p: Project, before: Arrangement): Project {
   return { ...p, sections, notes };
 }
 
-export const STEP_PATHS = ["/refine", "/sources", "/notes", "/outline", "/write", "/review"] as const;
+export const STEP_PATHS = ["/generate", "/refine", "/sources", "/notes", "/outline", "/write", "/review"] as const;
 
 /** Whether a step already has the student's work in it, for the progress marks in the step bar. */
 export function stepHasWork(p: Project, step: (typeof STEP_PATHS)[number]): boolean {
@@ -276,9 +276,9 @@ export function stepHasWork(p: Project, step: (typeof STEP_PATHS)[number]): bool
   }
 }
 
-/** Where to send the student when they reopen a project. */
+/** Where to send the student when they reopen a project: the step they left, or the AI writer for a new one. */
 export function resumePath(p: Project): string {
-  return STEP_PATHS.find((s) => s === p.lastStep) ?? STEP_PATHS[0];
+  return STEP_PATHS.find((s) => s === p.lastStep) ?? "/generate";
 }
 
 /** Replaces the first occurrence of a sentence in whichever section contains it. */

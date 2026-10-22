@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, Card, Field, inputClass, Notice, Spinner } from "../../components/ui";
 import { VoiceButton } from "../../components/voice-button";
-import { callAgent } from "../../lib/client/agent";
-import { useLocale, useT } from "../../lib/i18n";
+import { useT } from "../../lib/i18n";
 import { createProject } from "../../lib/project";
 import { projectStore } from "../../lib/store";
 import type { GradeBand, WritingType } from "../../lib/types";
@@ -20,7 +19,6 @@ const GRADES: GradeBand[] = ["4-6", "7-8", "9-10", "11-12", "adult"];
 
 export default function StartPage() {
   const t = useT();
-  const locale = useLocale();
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [writingType, setWritingType] = useState<WritingType>("report");
@@ -28,7 +26,7 @@ export default function StartPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function start(e: React.FormEvent) {
+  function start(e: React.FormEvent) {
     e.preventDefault();
     if (topic.trim().length < 5) {
       setError(t.start.topicTooShort);
@@ -44,15 +42,8 @@ export default function StartPage() {
       conclusionTitle: t.outline.conclusion,
     });
     projectStore.add(project);
-
-    const result = await callAgent("plan", { topic: project.topic, writingType, grade, locale, exclude: [] });
-    projectStore.update((p) =>
-      result.ok
-        ? { ...p, coachMessage: result.data.coachMessage, angles: result.data.angles.map((a, i) => ({ id: `${p.id}-a${i}`, ...a })), plan: result.data.plan }
-        : p,
-    );
-    if (!result.ok) setError(t.common.agentError);
-    router.push("/refine");
+    // The AI takes it from here: question, sources, notes, outline and every section.
+    router.push("/generate");
   }
 
   return (
@@ -121,7 +112,8 @@ export default function StartPage() {
 
         {error ? <Notice tone="error">{error}</Notice> : null}
 
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <p className="max-w-md text-center text-sm text-[var(--ink-muted)]">✨ {t.start.aiNote}</p>
           <Button type="submit" variant="primary" disabled={busy} className="min-w-64">
             {busy ? <Spinner label={t.refine.thinking} /> : `${t.start.submit} →`}
           </Button>

@@ -93,4 +93,7 @@ export interface Project {
   notes: Note[];
   sections: Section[];
   gaps: Gap[];
+  /** The paper's abstract and keywords, written by AI once every section has text. */
+  abstract?: string;
+  keywords?: string[];
 }

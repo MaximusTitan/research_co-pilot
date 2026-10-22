@@ -226,6 +226,69 @@ mark.key {
   padding: 0 0.15em;
 }
 
+/*
+ * The paper view on the Review screen: a page of paper on a desk. The page
+ * stays light in dark mode too, the way a printed paper would look.
+ */
+:root { --desk: #e6e9f2; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --desk: #0b0e17; }
+}
+:root[data-theme="dark"] { --desk: #0b0e17; }
+
+/* The empty state on the Review screen: a blank sheet. */
+.paper-sheet {
+  max-width: 51rem;
+  margin-inline: auto;
+  padding: 4rem 1.5rem;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 8px 28px -6px rgb(0 0 0 / 0.22);
+}
+
+/*
+ * Paper pages (components/paper-pages.tsx), sized in real-page pixels and set
+ * like a journal article: Times, 10pt two-column body, small-caps headings.
+ * Spacing uses padding, never margins, so measured heights add up exactly.
+ */
+/* contain: the pages must not widen the layout; they scale to whatever width they are given. */
+.pp-stack { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; width: 100%; contain: inline-size; }
+.pp-measure { position: fixed; left: -10000px; top: 0; visibility: hidden; pointer-events: none; }
+.pp-frame { position: relative; flex: none; }
+.pp-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 10px 30px -8px rgb(0 0 0 / 0.3);
+  overflow: hidden;
+}
+.pp-page, .pp-measure { font-family: "Times New Roman", Times, "Liberation Serif", "Nimbus Roman", serif; }
+.pp-page ::selection { background: #cfdcff; color: #111; }
+.pp-head { text-align: center; padding-bottom: 22px; }
+.pp-title { font-size: 30px; line-height: 1.2; font-weight: 400; padding-bottom: 14px; text-wrap: balance; }
+.pp-author { font-size: 15px; line-height: 1.3; }
+.pp-affil { font-size: 13px; line-height: 1.35; font-style: italic; }
+.pp-date { font-size: 12px; line-height: 1.35; color: #444; }
+.pp-col { font-size: 13.33px; line-height: 1.25; }
+.pp-col p, .pp-col h3 { text-wrap: wrap; }
+.pp-para { text-align: justify; hyphens: auto; text-indent: 1em; }
+.pp-para.pp-cont { text-indent: 0; }
+.pp-split { text-align-last: justify; }
+.pp-abstract, .pp-keywords { font-size: 12px; line-height: 1.25; font-weight: 700; text-align: justify; hyphens: auto; }
+.pp-abstract em, .pp-keywords em { font-style: italic; }
+.pp-abstract { padding-bottom: 8px; }
+.pp-keywords { padding-bottom: 10px; }
+.pp-heading, .pp-refHeading { font-size: 13.33px; font-weight: 400; font-variant: small-caps; letter-spacing: 0.02em; text-align: center; padding: 10px 0 5px; scroll-margin-top: 1rem; }
+.pp-ref { font-size: 10.67px; line-height: 1.25; text-align: left; padding: 0 0 3px 2.4em; text-indent: -2.4em; overflow-wrap: anywhere; }
+.pp-running { position: absolute; margin: 0; font-size: 10.67px; font-style: italic; color: #555; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-folio { position: absolute; left: 0; right: 0; margin: 0; font-size: 10.67px; text-align: center; color: #444; }
+
+@page paper { size: letter; margin: 0; }
+
 @media print {
   @page { margin: 2.2cm; }
   header, nav, button, .no-print { display: none !important; }
@@ -234,10 +297,10 @@ mark.key {
   .logo-on-dark { display: none !important; }
   main { max-width: none !important; padding: 0 !important; }
 
-  /* The printed paper: plain, serif and black on white, like a handed-in assignment. */
-  .paper { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.7; color: #000; }
-  .paper h1 { font-size: 20pt; font-weight: 700; text-align: center; margin: 0 0 1.4em; }
-  .paper h2 { font-size: 14pt; font-weight: 700; margin: 1.4em 0 0.5em; break-after: avoid; }
-  .paper p { margin: 0 0 0.8em; white-space: pre-wrap; orphans: 3; widows: 3; }
-  .paper .references p { padding-left: 2em; text-indent: -2em; }
+  /* The paper pages print at real size, one per sheet, exactly as they look on screen. */
+  .pp-stack { display: block; contain: none; }
+  .pp-frame { width: 8.5in !important; height: 11in !important; page: paper; break-after: page; }
+  .pp-frame:last-child { break-after: auto; }
+  .pp-page { transform: none !important; box-shadow: none; }
+  .pp-measure { display: none; }
 }

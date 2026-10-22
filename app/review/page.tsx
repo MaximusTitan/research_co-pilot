@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Button, Card, Notice, PageTitle, Spinner } from "../../components/ui";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { Button, Card, LinkButton, Notice, PageTitle, Spinner } from "../../components/ui";
 import { RequireProject } from "../../components/shell";
+import { useAuthUser } from "../../components/auth-provider";
+import { PaperPages, type PaperPagesMeta } from "../../components/paper-pages";
+import { abstractRequest } from "../../lib/client/autopilot";
 import { citedRefs, type CitationStyle } from "../../lib/citations";
-import { buildPaper, paperToText, type Paper } from "../../lib/paper";
+import { buildPaper, paperToText } from "../../lib/paper";
 import { callAgent } from "../../lib/client/agent";
 import { useFlash } from "../../lib/client/hooks";
 import { applyFix, checkGrammar, fixAllGrammar as fixGrammarText, checkOriginality, verifyCitations, type CitationProblem, type Issue } from "../../lib/checks";
@@ -78,6 +81,9 @@ function Review({ project }: { project: Project }) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [writingAbstract, setWritingAbstract] = useState(false);
+  const abstractStarted = useRef(false);
+  const user = useAuthUser();
 
   const draft = fullDraft(project);
   const originality = useMemo(() => checkOriginality(draft, project.sources), [draft, project.sources]);
@@ -200,11 +206,36 @@ function Review({ project }: { project: Project }) {
     );
   }
 
-  const paper = buildPaper(project, { intro: t.outline.intro, conclusion: t.outline.conclusion, references: t.review.references }, style);
+  const paperLabels = { abstract: t.review.abstract, keywords: t.review.keywords, intro: t.outline.intro, conclusion: t.outline.conclusion, references: t.review.references };
+  const paper = buildPaper(project, paperLabels, style);
+  const hasPaper = paper.sections.length > 0;
+  const meta: PaperPagesMeta = {
+    author: user?.displayName || user?.email?.split("@")[0] || t.review.yourPaper,
+    affiliation: `${t.start[project.writingType]} · ${t.start.grades[project.grade]}`,
+    date: new Intl.DateTimeFormat(locale === "hi" ? "hi-IN" : "en-US", { dateStyle: "long" }).format(project.updatedAt),
+    abstractLabel: t.review.abstract,
+    keywordsLabel: t.review.keywords,
+    pageLabel: t.review.page,
+    lang: locale,
+  };
+
+  // Papers written before abstracts existed, or by hand, get one the first time they're opened here.
+  const needsAbstract = hasPaper && !project.abstract;
+  const writeAbstract = useEffectEvent(async () => {
+    setWritingAbstract(true);
+    const result = await callAgent("abstract", abstractRequest(project, locale, { intro: t.outline.intro, conclusion: t.outline.conclusion }));
+    setWritingAbstract(false);
+    if (result.ok) projectStore.update((p) => (p.id === project.id ? { ...p, abstract: result.data.abstract, keywords: result.data.keywords } : p));
+  });
+  useEffect(() => {
+    if (!needsAbstract || abstractStarted.current) return;
+    abstractStarted.current = true;
+    void writeAbstract();
+  }, [needsAbstract]);
 
   async function copyText() {
     try {
-      await navigator.clipboard.writeText(paperToText(paper));
+      await navigator.clipboard.writeText(paperToText(paper, paperLabels));
       flashCopied();
     } catch {
       // Clipboard blocked: the text is still on the page.
@@ -218,7 +249,11 @@ function Review({ project }: { project: Project }) {
     const refs = paper.references.length
       ? `<h2>${escapeHtml(paper.referencesTitle)}</h2>${paper.references.map((r) => `<p>${escapeHtml(r)}</p>`).join("")}`
       : "";
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(paper.title)}</title></head><body><h1>${escapeHtml(paper.title)}</h1>${body}${refs}</body></html>`;
+    const front = [
+      paper.abstract ? `<p><b><i>${escapeHtml(t.review.abstract)}</i>—${escapeHtml(paper.abstract)}</b></p>` : "",
+      paper.keywords.length ? `<p><b><i>${escapeHtml(t.review.keywords)}</i>—${escapeHtml(paper.keywords.join(", "))}</b></p>` : "",
+    ].join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(paper.title)}</title></head><body><h1>${escapeHtml(paper.title)}</h1><p><i>${escapeHtml(meta.author)}</i><br/>${escapeHtml(meta.affiliation)}<br/>${escapeHtml(meta.date)}</p>${front}${body}${refs}</body></html>`;
     const url = URL.createObjectURL(new Blob([html], { type: "application/msword" }));
     const a = document.createElement("a");
     a.href = url;
@@ -231,20 +266,21 @@ function Review({ project }: { project: Project }) {
   const usedCount = saved.filter((s) => s.ref !== null && citedRefs(draft).includes(s.ref)).length;
   const originalityOk = originality.score >= 90;
   const toFix = (originalityOk ? 0 : 1) + (grammarCount ? 1 : 0) + (citationCount ? 1 : 0);
-  const hasPaper = paper.sections.length > 0;
-
-  const tiles: { id: string; label: string; value: string; ok: boolean }[] = [
-    { id: "check-originality", label: t.review.originality, value: `${originality.score}%`, ok: originalityOk },
-    { id: "check-grammar", label: t.review.tileGrammar, value: grammarCount ? t.review.toFixCount(grammarCount) : t.review.allClear, ok: grammarCount === 0 },
+  const checks: { id: string; label: string; value: string; ok: boolean }[] = [
     { id: "check-citations", label: t.review.tileCitations, value: citationCount ? t.review.toFixCount(citationCount) : t.review.allClear, ok: citationCount === 0 },
-    { id: "paper", label: t.review.tileSources, value: t.review.usedOf(usedCount, saved.length), ok: saved.length > 0 && usedCount === saved.length },
+    { id: "check-grammar", label: t.review.tileGrammar, value: grammarCount ? t.review.toFixCount(grammarCount) : t.review.allClear, ok: grammarCount === 0 },
+    { id: "check-originality", label: t.review.originality, value: `${originality.score}%`, ok: originalityOk },
+    { id: "check-sources", label: t.review.tileSources, value: t.review.usedOf(usedCount, saved.length), ok: saved.length > 0 && usedCount === saved.length },
   ];
+  const wordCount = paper.sections.reduce((n, s) => n + s.paragraphs.join(" ").split(/\s+/).filter(Boolean).length, 0);
+  const tocLink =
+    "flex gap-2 rounded-md px-2 py-1.5 text-[var(--ink-muted)] transition-colors duration-150 hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]";
 
   return (
     <>
-    {/* Printing (and "Save as PDF") shows only the paper, never the checks around it. */}
-    <PrintablePaper paper={paper} />
-    <div className="flex flex-col gap-6 print:hidden">
+    {/* Printing (and "Save as PDF") shows only the paper pages, never the checks around them. */}
+    <div className="flex flex-col gap-6 print:block">
+      <div className="print:hidden">
       <PageTitle
         subtitle={hasPaper ? (toFix === 0 ? `✓ ${t.review.ready}` : t.review.notReady(toFix)) : t.review.paperEmpty}
         actions={
@@ -255,39 +291,26 @@ function Review({ project }: { project: Project }) {
           </>
         }
       >
-        {t.review.title}
+        {t.review.paperTitle}
       </PageTitle>
+      </div>
 
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label={t.review.summary}>
-        {tiles.map((tile) => (
-          <li key={tile.id}>
-            <a
-              href={`#${tile.id}`}
-              className={`flex h-full flex-col gap-1 rounded-2xl border p-4 shadow-[var(--shadow-sm)] transition-colors duration-150 hover:border-[var(--line-strong)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] ${
-                tile.ok ? "border-[var(--line)] bg-[var(--surface)]" : "border-[var(--warn)] bg-[var(--warn-bg)]"
-              }`}
-            >
-              <span className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
-                <span aria-hidden className={`grid size-5 place-items-center rounded-full text-xs font-bold ${tile.ok ? "bg-[var(--ok-bg)] text-[var(--ok-ink)]" : "bg-[var(--warn)] text-[var(--bg)]"}`}>
-                  {tile.ok ? "✓" : "!"}
-                </span>
-                {tile.label}
-              </span>
-              <span className="text-xl font-bold tabular-nums">{tile.value}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
+      {notice ? <div className="print:hidden"><Notice tone="warn">{notice}</Notice></div> : null}
 
-      {notice ? <Notice tone="warn">{notice}</Notice> : null}
-
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-        <section id="paper" aria-label={t.review.yourPaper} className="min-w-0 scroll-mt-4 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-md)]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-3">
-            <div>
-              <h2 className="font-semibold">{t.review.yourPaper}</h2>
-              <p className="text-sm text-[var(--ink-muted)]">{t.review.yourPaperHelp}</p>
-            </div>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] print:block">
+        <section id="paper" aria-label={t.review.yourPaper} className="min-w-0 scroll-mt-4 rounded-2xl bg-[var(--desk)] p-2 sm:p-6 print:rounded-none print:bg-transparent print:p-0">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1 print:hidden">
+            <p className="text-sm tabular-nums text-[var(--ink-muted)]">
+              {hasPaper
+                ? [
+                    t.review.words(wordCount),
+                    t.review.readTime(Math.max(1, Math.round(wordCount / 200))),
+                    t.review.sectionsCount(paper.sections.length),
+                    t.review.sourcesCount(paper.references.length),
+                  ].join(" · ")
+                : t.review.yourPaperHelp}
+              {writingAbstract ? ` · ${t.generate.stages.abstract}…` : ""}
+            </p>
             <div role="group" aria-label={t.review.referenceStyle} className="flex items-center gap-1">
               <span className="mr-1 text-sm text-[var(--ink-muted)]">{t.review.referenceStyle}</span>
               {(["apa", "mla"] as const).map((s) => (
@@ -298,81 +321,127 @@ function Review({ project }: { project: Project }) {
             </div>
           </div>
           {hasPaper ? (
-            <div className="px-5 py-8 sm:px-10 sm:py-10">
-              <PaperView
-                paper={paper}
-                className="mx-auto max-w-[68ch] font-serif text-[1.05rem] leading-[1.8] [&_h1]:mb-8 [&_h1]:text-center [&_h1]:text-2xl [&_h1]:leading-snug [&_h1]:font-bold sm:[&_h1]:text-3xl [&_h2]:mt-8 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_p]:mb-3 [&_p]:whitespace-pre-wrap [&_.references]:mt-10 [&_.references]:border-t [&_.references]:border-[var(--line)] [&_.references]:pt-2 [&_.references_p]:pl-8 [&_.references_p]:-indent-8 [&_.references_p]:text-sm [&_.references_p]:break-words"
-              />
-            </div>
+            <PaperPages paper={paper} meta={meta} />
           ) : (
-            <p className="px-5 py-10 text-center text-[var(--ink-muted)]">{t.review.paperEmpty}</p>
+            <div className="paper-sheet flex flex-col items-center gap-4 text-center">
+              <p>{t.review.paperEmpty}</p>
+              <LinkButton href="/generate">✨ {t.review.writeWithAi}</LinkButton>
+            </div>
           )}
         </section>
 
-        <aside className="flex min-w-0 flex-col gap-4" aria-label={t.review.toFixTitle}>
-          <Card as="section" label={t.review.tileCitations} className="scroll-mt-4">
-            <h2 id="check-citations" className="mb-2 flex scroll-mt-4 items-center justify-between gap-2 font-semibold">
-              {t.review.tileCitations}
-              <StatusPill ok={citationCount === 0} text={citationCount ? t.review.toFixCount(citationCount) : t.review.allClear} />
-            </h2>
-            {problems.length === 0 ? <p className="text-sm text-[var(--ink-muted)]">{t.review.allSupported}</p> : null}
-            <ul className="flex flex-col gap-2">
-              {problems.map((p, i) => (
-                <li key={`${p.kind}-${i}`} className="rounded-lg border border-[var(--line)] p-3 text-sm">
-                  <p className="font-medium">{problemText(t, p)}</p>
-                  {p.sentence ? <p className="mt-1 text-[var(--ink-muted)]">“{p.sentence}”</p> : null}
-                  {p.sentence && isFixable(p.kind) ? (
-                    <ProblemFix problem={p.kind} sentence={p.sentence} fixes={fixes} onRequest={requestFix} onApply={replaceSentence} onSkip={clearFix} />
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          <Card as="section" label={t.review.tileGrammar}>
-            <h2 id="check-grammar" className="mb-2 flex scroll-mt-4 items-center justify-between gap-2 font-semibold">
-              {t.review.tileGrammar}
-              <StatusPill ok={grammarCount === 0} text={grammarCount ? t.review.toFixCount(grammarCount) : t.review.allClear} />
-            </h2>
-            {grammarCount === 0 ? <p className="text-sm text-[var(--ink-muted)]">{t.review.noIssues}</p> : null}
-            <ul className="flex flex-col gap-2">
-              {grammar.flatMap(({ section, issues }) =>
-                issues.map((issue) => (
-                  <li key={`${section.id}-${issue.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] p-2 pl-3">
-                    <span className="min-w-0 text-sm">{issueText(t, issue)}</span>
-                    {issue.replacement !== null ? (
-                      <Button className="min-h-9 shrink-0 px-3 text-sm" onClick={() => fix(section, issue)}>{t.review.fix}</Button>
-                    ) : null}
-                  </li>
-                )),
-              )}
-            </ul>
-            {grammar.some(({ issues }) => issues.some((i) => i.replacement !== null)) ? (
-              <Button className="mt-3 w-full" onClick={fixAllGrammar}>{t.review.fixAll}</Button>
-            ) : null}
-          </Card>
-
-          <Card as="section" label={t.review.originality}>
-            <h2 id="check-originality" className="mb-2 flex scroll-mt-4 items-center justify-between gap-2 font-semibold">
-              {t.review.originality}
-              <StatusPill ok={originalityOk} text={`${originality.score}%`} />
-            </h2>
-            <p className="text-sm text-[var(--ink-muted)]">{originality.flagged.length === 0 ? t.review.ownWords : t.review.tooClose}</p>
-            {originality.flagged.length > 0 ? (
-              <ul className="mt-3 flex flex-col gap-2 text-sm">
-                {originality.flagged.map((f) => (
-                  <li key={f.sentence} className="rounded-lg border border-[var(--line)] p-3">
-                    <p>{f.sentence}</p>
-                    <p className="mt-1 text-[var(--ink-muted)]">{t.review.copiedFrom}</p>
-                    {project.sources.some((s) => s.id === f.sourceId && s.saved) ? (
-                      <Button className="mt-2 min-h-9 px-3 text-sm" onClick={() => quoteSentence(f.sentence, f.sourceId)}>
-                        {t.review.makeQuote}
-                      </Button>
-                    ) : null}
+        <aside className="flex min-w-0 flex-col gap-4 print:hidden" aria-label={t.review.toFixTitle}>
+          {hasPaper ? (
+            <Card as="section" label={t.review.contents}>
+              <h2 className="mb-2 font-semibold">{t.review.contents}</h2>
+              <ol className="flex flex-col gap-0.5 text-sm">
+                {paper.sections.map((s, i) => (
+                  <li key={`${i}-${s.heading}`}>
+                    <a href={`#paper-section-${i}`} className={tocLink}>
+                      <span className="w-5 shrink-0 tabular-nums">{i + 1}.</span>
+                      <span className="min-w-0">{s.heading}</span>
+                    </a>
                   </li>
                 ))}
-              </ul>
-            ) : null}
+                {paper.references.length ? (
+                  <li>
+                    <a href="#paper-references" className={tocLink}>
+                      <span aria-hidden className="w-5 shrink-0" />
+                      <span>{paper.referencesTitle}</span>
+                    </a>
+                  </li>
+                ) : null}
+              </ol>
+            </Card>
+          ) : null}
+
+          <Card as="section" label={t.review.checksTitle}>
+            <h2 className="mb-1 flex items-center justify-between gap-2 font-semibold">
+              {t.review.checksTitle}
+              {hasPaper && toFix === 0 ? <StatusPill ok text={t.review.allChecksPass} /> : null}
+            </h2>
+            <div className="flex flex-col divide-y divide-[var(--line)]">
+              {checks.map((c) => (
+                <details key={c.id} id={c.id} className="group scroll-mt-4 py-1">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-md text-sm focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden className="inline-block w-2 text-[var(--ink-muted)] transition-transform duration-150 group-open:rotate-90">›</span>
+                      {c.label}
+                    </span>
+                    <StatusPill ok={c.ok} text={c.value} />
+                  </summary>
+                  <div className="pb-2 pl-4">
+                    {c.id === "check-citations" ? (
+                      <>
+                        {problems.length === 0 ? <p className="text-sm text-[var(--ink-muted)]">{t.review.allSupported}</p> : null}
+                        <ul className="flex flex-col gap-2">
+                          {problems.map((p, i) => (
+                            <li key={`${p.kind}-${i}`} className="rounded-lg border border-[var(--line)] p-3 text-sm">
+                              <p className="font-medium">{problemText(t, p)}</p>
+                              {p.sentence ? <p className="mt-1 text-[var(--ink-muted)]">“{p.sentence}”</p> : null}
+                              {p.sentence && isFixable(p.kind) ? (
+                                <ProblemFix problem={p.kind} sentence={p.sentence} fixes={fixes} onRequest={requestFix} onApply={replaceSentence} onSkip={clearFix} />
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : null}
+                    {c.id === "check-grammar" ? (
+                      <>
+                        {grammarCount === 0 ? <p className="text-sm text-[var(--ink-muted)]">{t.review.noIssues}</p> : null}
+                        <ul className="flex flex-col gap-2">
+                          {grammar.flatMap(({ section, issues }) =>
+                            issues.map((issue) => (
+                              <li key={`${section.id}-${issue.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] p-2 pl-3">
+                                <span className="min-w-0 text-sm">{issueText(t, issue)}</span>
+                                {issue.replacement !== null ? (
+                                  <Button className="min-h-9 shrink-0 px-3 text-sm" onClick={() => fix(section, issue)}>{t.review.fix}</Button>
+                                ) : null}
+                              </li>
+                            )),
+                          )}
+                        </ul>
+                        {grammar.some(({ issues }) => issues.some((i) => i.replacement !== null)) ? (
+                          <Button className="mt-3 w-full" onClick={fixAllGrammar}>{t.review.fixAll}</Button>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {c.id === "check-originality" ? (
+                      <>
+                        <p className="text-sm text-[var(--ink-muted)]">{originality.flagged.length === 0 ? t.review.ownWords : t.review.tooClose}</p>
+                        {originality.flagged.length > 0 ? (
+                          <ul className="mt-3 flex flex-col gap-2 text-sm">
+                            {originality.flagged.map((f) => (
+                              <li key={f.sentence} className="rounded-lg border border-[var(--line)] p-3">
+                                <p>{f.sentence}</p>
+                                <p className="mt-1 text-[var(--ink-muted)]">{t.review.copiedFrom}</p>
+                                {project.sources.some((s) => s.id === f.sourceId && s.saved) ? (
+                                  <Button className="mt-2 min-h-9 px-3 text-sm" onClick={() => quoteSentence(f.sentence, f.sourceId)}>
+                                    {t.review.makeQuote}
+                                  </Button>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {c.id === "check-sources" ? (
+                      <ul className="flex flex-col gap-1 text-sm">
+                        {saved.length === 0 ? <li className="text-[var(--ink-muted)]">{t.review.noSources}</li> : null}
+                        {saved.map((s) => (
+                          <li key={s.id} className="flex gap-2">
+                            <span className="shrink-0 tabular-nums text-[var(--ink-muted)]">[{s.ref}]</span>
+                            <span className="min-w-0">{s.title}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </details>
+              ))}
+            </div>
           </Card>
 
           <Card as="section" label={t.review.feedbackTitle} className="bg-[var(--accent-soft)]">
@@ -445,6 +514,16 @@ function Review({ project }: { project: Project }) {
               )
             ) : null}
           </Card>
+
+          <Card as="section" label={t.review.fineTune}>
+            <h2 className="font-semibold">{t.review.fineTune}</h2>
+            <p className="mb-3 text-sm text-[var(--ink-muted)]">{t.review.fineTuneHelp}</p>
+            <div className="flex flex-wrap gap-2">
+              <LinkButton href="/write" variant="secondary">✎ {t.review.editText}</LinkButton>
+              <LinkButton href="/sources" variant="secondary">{t.review.editSources}</LinkButton>
+              <LinkButton href="/outline" variant="secondary">{t.review.editOutline}</LinkButton>
+            </div>
+          </Card>
         </aside>
       </div>
     </div>
@@ -458,34 +537,6 @@ function StatusPill({ ok, text }: { ok: boolean; text: string }) {
       {ok ? "✓ " : ""}
       {text}
     </span>
-  );
-}
-
-function PrintablePaper({ paper }: { paper: Paper }) {
-  return <PaperView paper={paper} className="paper hidden print:block" />;
-}
-
-function PaperView({ paper, className }: { paper: Paper; className: string }) {
-  return (
-    <article className={className}>
-      <h1>{paper.title}</h1>
-      {paper.sections.map((s, i) => (
-        <section key={`${i}-${s.heading}`}>
-          <h2>{s.heading}</h2>
-          {s.paragraphs.map((p, j) => (
-            <p key={j}>{p}</p>
-          ))}
-        </section>
-      ))}
-      {paper.references.length ? (
-        <section className="references">
-          <h2>{paper.referencesTitle}</h2>
-          {paper.references.map((r) => (
-            <p key={r}>{r}</p>
-          ))}
-        </section>
-      ) : null}
-    </article>
   );
 }
 

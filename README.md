@@ -1,7 +1,11 @@
 # Research Mate
 
 An AI research partner that turns a student's idea into well-sourced research, one step at a time.
-The flow follows the wireframes: **Start → Refine → Sources → Notes → Outline → Write → Review**.
+Students answer three questions on **Start** (topic, what they're writing, their level) and the AI does the rest on
+**Generate**: it picks a research question, finds and saves trusted sources, takes notes, builds the outline and writes
+every section. They land on **Review**, which lays the finished paper out like a journal article (letter-size pages, abstract and
+keywords, two columns, numbered pages), with checks and exports beside it. PDF / Print gives the same pages.
+The hands-on steps (Refine, Sources, Notes, Outline, Write) are still there for anyone who wants to change something.
 
 Students sign up with email and password and confirm their email before signing in. Each account's projects are saved in Supabase and protected by
 row-level security, so nobody can read or change another student's work.

@@ -25,19 +25,41 @@ export interface Sentence {
   end: number;
 }
 
-/** Splits text into sentences, keeping their character offsets. */
+/** Abbreviations that never end a sentence ("Dr. Lee", "e.g. bees"). */
+const NEVER_ENDS = new Set(["dr", "mr", "mrs", "ms", "prof", "st", "vs", "e.g", "i.e", "cf", "fig", "no", "approx"]);
+
+/**
+ * Whether the full stop at `dot` ends the sentence. Dotted abbreviations such
+ * as "a.m." or "U.S." end it only when a capital letter comes next.
+ */
+function endsAtDot(text: string, from: number, dot: number, after: number): boolean {
+  const token = (text.slice(from, dot).match(/[\p{L}\p{N}.]+$/u)?.[0] ?? "").toLowerCase();
+  if (NEVER_ENDS.has(token)) return false;
+  if (!token.includes(".")) return true;
+  return /^\s*\p{Lu}/u.test(text.slice(after));
+}
+
+/** Splits text into sentences, keeping their character offsets. Decimals ("90.6") and abbreviations don't split. */
 export function sentences(text: string): Sentence[] {
   const out: Sentence[] = [];
-  // "।" (danda) ends a sentence in Hindi.
-  const re = /[^.!?।\n]+(?:[.!?।]+["'”)\]]*|\n|$)/g;
-  for (const match of text.matchAll(re)) {
-    const raw = match[0];
-    const lead = raw.length - raw.trimStart().length;
+  const push = (from: number, to: number) => {
+    const raw = text.slice(from, to);
     const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const start = (match.index ?? 0) + lead;
+    if (!trimmed) return;
+    const start = from + raw.length - raw.trimStart().length;
     out.push({ text: trimmed, start, end: start + trimmed.length });
+  };
+  // "।" (danda) ends a sentence in Hindi. Punctuation only ends one when a space or the end of the text follows.
+  const re = /[.!?।]+["'”)\]]*(?=\s|$)|\n/g;
+  let from = 0;
+  for (const match of text.matchAll(re)) {
+    const at = match.index ?? 0;
+    const after = at + match[0].length;
+    if (/^\.["'”)\]]*$/.test(match[0]) && !endsAtDot(text, from, at, after)) continue;
+    push(from, after);
+    from = after;
   }
+  push(from, text.length);
   return out;
 }
 

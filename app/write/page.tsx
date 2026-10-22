@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Button, Card, LinkButton, Notice, PageTitle, Spinner } from "../../components/ui";
 import { RequireProject } from "../../components/shell";
 import { callAgent } from "../../lib/client/agent";
+import { draftRequest as buildDraftRequest } from "../../lib/client/autopilot";
 import { useLocale, useT } from "../../lib/i18n";
 import { fillIfEmpty, notesFor, saveNoteSources, savedSources, setDraft } from "../../lib/project";
 import { projectStore, useSaveStatus } from "../../lib/store";
@@ -60,24 +61,8 @@ function Write({ project }: { project: Project }) {
     return ready;
   }
 
-  /** Everything the Writing Partner needs for one section: its notes, saved sources and the outline. */
-  function draftRequest(project: Project, target: Section) {
-    const sources = savedSources(project);
-    const refOf = (sourceId: string | null) => sources.find((s) => s.id === sourceId)?.ref ?? null;
-    return {
-      question: (project.question ?? project.topic).slice(0, 500),
-      writingType: project.writingType,
-      grade: project.grade,
-      locale,
-      section: { kind: target.kind, title: sectionName(target, t).slice(0, 120), keyPoint: target.keyPoint?.slice(0, 500) ?? null },
-      outline: project.sections.slice(0, 20).map((s) => sectionName(s, t).slice(0, 120)),
-      notes: notesFor(project, target.id)
-        .slice(0, 40)
-        .map((n) => ({ text: n.text.slice(0, 1000), ref: refOf(n.sourceId) })),
-      sources: sources.slice(0, 30).flatMap((s) => (s.ref === null ? [] : [{ ref: s.ref, title: s.title.slice(0, 300), summary: s.summary.slice(0, 1500) }])),
-      existing: target.draft.slice(0, 8000),
-    };
-  }
+  const labels = { intro: t.outline.intro, conclusion: t.outline.conclusion };
+  const draftRequest = (project: Project, target: Section) => buildDraftRequest(project, target, locale, labels);
 
   const canDraft = (target: Section) => target.kind !== "body" || notesFor(project, target.id).length > 0;
 

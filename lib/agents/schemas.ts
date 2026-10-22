@@ -111,6 +111,14 @@ export const feedbackInput = z.object({
   sections: z.array(z.object({ title: z.string().trim().min(1).max(120), text: z.string().max(8000) })).min(1).max(20),
 });
 
+export const abstractInput = z.object({
+  question: shortText,
+  writingType,
+  grade,
+  locale,
+  sections: z.array(z.object({ title: z.string().trim().min(1).max(120), text: z.string().max(8000) })).min(1).max(20),
+});
+
 // ---------- Outputs (also used as Claude structured-output schemas) ----------
 
 export const planOutput = z.object({
@@ -193,6 +201,8 @@ export const feedbackOutput = z.object({
   improvements: z.array(z.object({ section: z.string(), advice: z.string() })),
 });
 
+export const abstractOutput = z.object({ abstract: z.string(), keywords: z.array(z.string()) });
+
 export const agents = {
   plan: { input: planInput, output: planOutput },
   sources: { input: sourcesInput, output: sourcesOutput },
@@ -205,6 +215,7 @@ export const agents = {
   draft: { input: draftInput, output: draftOutput },
   fixClaim: { input: fixClaimInput, output: fixClaimOutput },
   feedback: { input: feedbackInput, output: feedbackOutput },
+  abstract: { input: abstractInput, output: abstractOutput },
 } as const;
 
 export type AgentName = keyof typeof agents;
