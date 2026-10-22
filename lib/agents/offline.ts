@@ -321,3 +321,71 @@ export function offlineFeedback(input: AgentInput<"feedback">): AgentOutput<"fee
   ];
   return { overall: text.overall, strengths, improvements };
 }
+
+/** An abstract made of each section's opening sentence, with keywords from the research question. */
+export function offlineAbstract(input: AgentInput<"abstract">): AgentOutput<"abstract"> {
+  const openers = input.sections
+    .map((s) => sentences(s.text)[0]?.text.replace(/\s*\[[\d,\s]+\]/g, "") ?? "")
+    .filter(Boolean)
+    .slice(0, 5);
+  const counts = new Map<string, number>();
+  for (const k of keywords([input.question, ...input.sections.map((s) => s.text)].join(" "))) counts.set(k, (counts.get(k) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k);
+  return { abstract: openers.join(" "), keywords: top };
+}
+
+const INTERVIEW_TEXT: Record<L, { focus: (c: string) => string; audience: string; audiences: [string, string][]; purpose: string; purposes: [string, string][] }> = {
+  en: {
+    focus: (c) => `Which part of ${c} interests you most?`,
+    audience: "Who is your paper for?",
+    audiences: [
+      ["My teacher and class", "The usual school reader"],
+      ["Younger students", "Simple words, clear examples"],
+      ["Parents and families", "Practical and everyday"],
+      ["People who know the subject", "More detail and evidence"],
+    ],
+    purpose: "What should your paper do?",
+    purposes: [
+      ["Explain what is known", "Clear and neutral"],
+      ["Compare different views", "Weigh each side"],
+      ["Argue for an answer", "Take a clear position"],
+      ["Suggest solutions", "Focus on what can be done"],
+    ],
+  },
+  hi: {
+    focus: (c) => `“${c}” का कौन-सा हिस्सा आपको सबसे दिलचस्प लगता है?`,
+    audience: "आपका पेपर किसके लिए है?",
+    audiences: [
+      ["मेरे शिक्षक और कक्षा", "सामान्य स्कूल पाठक"],
+      ["छोटे छात्र", "आसान शब्द, साफ़ उदाहरण"],
+      ["माता-पिता और परिवार", "व्यावहारिक और रोज़मर्रा"],
+      ["विषय के जानकार", "ज़्यादा विवरण और सबूत"],
+    ],
+    purpose: "आपका पेपर क्या करे?",
+    purposes: [
+      ["जो पता है उसे समझाए", "साफ़ और निष्पक्ष"],
+      ["अलग-अलग राय की तुलना करे", "हर पक्ष को परखे"],
+      ["एक जवाब के पक्ष में तर्क दे", "साफ़ पक्ष ले"],
+      ["उपाय सुझाए", "क्या किया जा सकता है"],
+    ],
+  },
+};
+
+/**
+ * Without AI: three fixed questions (which part of the topic, who it's for,
+ * what it should do), then the research question of the chosen angle.
+ */
+export function offlineInterview(input: AgentInput<"interview">): AgentOutput<"interview"> {
+  const text = INTERVIEW_TEXT[input.locale];
+  const answers = input.answers ?? [];
+  const angles = offlinePlan({ topic: input.topic, writingType: input.writingType, grade: input.grade, locale: input.locale, exclude: [] }).angles.slice(0, 4);
+  const steps = [
+    { question: text.focus(corePhrase(input.topic).toLowerCase()), options: angles.map((a) => ({ label: a.title, hint: a.questions[0] })) },
+    { question: text.audience, options: text.audiences.map(([label, hint]) => ({ label, hint })) },
+    { question: text.purpose, options: text.purposes.map(([label, hint]) => ({ label, hint })) },
+  ];
+  const next = steps[answers.length];
+  if (next && answers.length < (input.maxQuestions ?? 6)) return { done: false, ...next, researchQuestion: "" };
+  const chosen = angles.find((a) => a.title === answers[0]?.answer);
+  return { done: true, question: "", options: [], researchQuestion: chosen?.questions[0] ?? answers[0]?.answer ?? input.topic };
+}

@@ -1,6 +1,7 @@
 import type { Source } from "./types";
 
-export type CitationStyle = "apa" | "mla";
+export type CitationStyle = "apa" | "mla" | "ieee";
+export const CITATION_STYLES: CitationStyle[] = ["apa", "mla", "ieee"];
 
 interface Name {
   given: string[];
@@ -47,6 +48,17 @@ function mlaAuthors(authors: string[]): string {
   return `${inverted}, et al`;
 }
 
+function ieeeAuthors(authors: string[]): string {
+  const names = authors.map((a) => {
+    const { given, family } = parseName(a);
+    const init = initials(given);
+    return init ? `${init} ${family}` : family;
+  });
+  if (names.length <= 2) return names.join(" and ");
+  if (names.length > 6) return `${names[0]} et al.`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
 function withPeriod(text: string): string {
   return /[.?!]$/.test(text) ? text : `${text}.`;
 }
@@ -60,6 +72,12 @@ export function formatCitation(source: Source, style: CitationStyle): string {
     const year = source.year ?? "n.d.";
     const publisher = authors.length && source.publisher ? ` ${withPeriod(source.publisher)}` : "";
     return `${withPeriod(who)} (${year}). ${withPeriod(source.title)}${publisher}${url ? ` ${url}` : ""}`.trim();
+  }
+
+  if (style === "ieee") {
+    const who = authors.length ? `${ieeeAuthors(authors)}, ` : "";
+    const where = [source.publisher, source.year?.toString()].filter(Boolean).join(", ");
+    return `${who}“${source.title.replace(/[.,]$/, "")},” ${where ? withPeriod(where) : ""}${url ? ` [Online]. Available: ${url}` : ""}`.trim();
   }
 
   const who = authors.length ? `${withPeriod(mlaAuthors(authors))} ` : "";
@@ -83,6 +101,53 @@ export function keepKnownCitations(text: string, allowed: ReadonlySet<number>): 
       return `${lead}[${kept.join(", ")}]`;
     })
     .trim();
+}
+
+/** Drops a trailing "(…)" from a publisher name: "PubMed Central (NIH)" → "PubMed Central". */
+function shortPublisher(publisher: string): string {
+  return publisher.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
+/**
+ * The name a source goes by in the text: family names for authored works,
+ * otherwise the publisher, or a short quoted title when two sources would
+ * otherwise share a publisher name.
+ */
+export function inTextName(source: Source, all: Source[], style: "apa" | "mla"): string {
+  // Sources sometimes list "et al." as if it were an author; it means "and more".
+  const named = source.authors.filter((a) => a.trim());
+  const listed = named.filter((a) => !/^et\.?\s*al\.?$/i.test(a.trim()));
+  const families = listed.map((a) => parseName(a).family);
+  if (families.length >= 1 && listed.length < named.length) return `${families[0]} et al.`;
+  if (families.length === 1) return families[0];
+  if (families.length === 2) return style === "apa" ? `${families[0]} & ${families[1]}` : `${families[0]} and ${families[1]}`;
+  if (families.length > 2) return `${families[0]} et al.`;
+  const publisher = shortPublisher(source.publisher);
+  const shared = all.filter((s) => s.authors.length === 0 && shortPublisher(s.publisher) === publisher).length > 1;
+  if (publisher && !shared) return publisher;
+  const words = source.title.split(/\s+/);
+  return `“${words.slice(0, 4).join(" ")}${words.length > 4 ? "…" : ""}”`;
+}
+
+/**
+ * Rewrites the stored [n] markers for the chosen style: APA "(Smith, 2020)",
+ * MLA "(Smith)", IEEE keeps "[n]". Drafts always store [n], so switching style
+ * never changes what the student wrote.
+ */
+export function styleCitations(text: string, style: CitationStyle, sources: Source[]): string {
+  if (style === "ieee") return text;
+  return text.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (match, group: string) => {
+    const cited = group
+      .split(",")
+      .map((n) => sources.find((s) => s.ref === Number(n.trim())))
+      .filter((s): s is Source => Boolean(s));
+    if (cited.length === 0) return match;
+    const parts = cited.map((s) => {
+      const name = inTextName(s, sources, style);
+      return style === "apa" ? `${name}, ${s.year ?? "n.d."}` : name;
+    });
+    return `(${parts.join("; ")})`;
+  });
 }
 
 /** Citation numbers like [1] or [2, 3] used in the draft. */

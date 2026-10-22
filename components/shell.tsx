@@ -12,6 +12,7 @@ import { useAuthUser } from "./auth-provider";
 import { Logo } from "./logo";
 import { Button, LinkButton, Spinner } from "./ui";
 
+/** The hands-on steps. AI does them all up front; this bar appears only when the student opens one to change it. */
 const STEPS = [
   { href: "/refine", key: "refine" },
   { href: "/sources", key: "sources" },
@@ -60,7 +61,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </nav>
         </div>
         <SaveStatus />
-        {user && project && pathname !== APP_HOME && pathname !== "/projects" ? (
+        {user && project && STEPS.some((s) => s.href === pathname) && pathname !== "/review" ? (
           <nav aria-label={t.nav.steps} className="border-t border-[var(--line)]">
             <ol className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 py-2 text-sm">
               {STEPS.map((step, i) => {
