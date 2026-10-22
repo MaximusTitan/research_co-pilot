@@ -3,6 +3,9 @@ import { z } from "zod";
 const locale = z.enum(["en", "hi"]);
 const grade = z.enum(["4-6", "7-8", "9-10", "11-12", "adult"]);
 const shortText = z.string().trim().min(1).max(500);
+const paperLength = z.enum(["short", "standard", "long"]);
+/** The student's own directions from the Start questions, passed on to the writing agents. */
+const directions = z.string().trim().max(1500).default("");
 
 // ---------- Inputs (validated on the server; limits keep requests small) ----------
 
@@ -21,6 +24,8 @@ export const sourcesInput = z.object({
   locale,
   /** Page of results; "Find more" asks for the next page. */
   page: z.number().int().min(1).max(5).default(1),
+  /** What kind of sources the student wants the paper to lean on. */
+  preference: z.string().trim().max(400).default(""),
 });
 
 export const analyzeInput = z.object({
@@ -73,6 +78,8 @@ export const outlineInput = z.object({
   writingType,
   grade,
   locale,
+  length: paperLength.default("standard"),
+  directions,
   notes: z.array(noteRef).min(1).max(80),
 });
 
@@ -81,6 +88,8 @@ export const draftInput = z.object({
   writingType,
   grade,
   locale,
+  length: paperLength.default("standard"),
+  directions,
   section: z.object({
     kind: z.enum(["intro", "body", "conclusion"]),
     title: z.string().trim().min(1).max(120),
@@ -117,6 +126,19 @@ export const abstractInput = z.object({
   grade,
   locale,
   sections: z.array(z.object({ title: z.string().trim().min(1).max(120), text: z.string().max(8000) })).min(1).max(20),
+});
+
+export const interviewInput = z.object({
+  topic: z.string().trim().min(5).max(500),
+  writingType,
+  grade,
+  locale,
+  /** Questions asked so far and the student's answers, oldest first. */
+  answers: z
+    .array(z.object({ question: z.string().trim().min(1).max(300), answer: z.string().trim().min(1).max(300) }))
+    .max(10)
+    .default([]),
+  maxQuestions: z.number().int().min(2).max(8).default(6),
 });
 
 // ---------- Outputs (also used as Claude structured-output schemas) ----------
@@ -203,6 +225,14 @@ export const feedbackOutput = z.object({
 
 export const abstractOutput = z.object({ abstract: z.string(), keywords: z.array(z.string()) });
 
+/** Either the next multiple-choice question, or (done) the research question the answers add up to. */
+export const interviewOutput = z.object({
+  done: z.boolean(),
+  question: z.string(),
+  options: z.array(z.object({ label: z.string(), hint: z.string() })),
+  researchQuestion: z.string(),
+});
+
 export const agents = {
   plan: { input: planInput, output: planOutput },
   sources: { input: sourcesInput, output: sourcesOutput },
@@ -216,6 +246,7 @@ export const agents = {
   fixClaim: { input: fixClaimInput, output: fixClaimOutput },
   feedback: { input: feedbackInput, output: feedbackOutput },
   abstract: { input: abstractInput, output: abstractOutput },
+  interview: { input: interviewInput, output: interviewOutput },
 } as const;
 
 export type AgentName = keyof typeof agents;

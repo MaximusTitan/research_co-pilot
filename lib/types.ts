@@ -23,6 +23,24 @@ export type TrustReasonKey =
 export type AngleTag = "lots" | "easy" | "harder" | "fewer";
 export type SectionKind = "intro" | "body" | "conclusion";
 export type Locale = "en" | "hi";
+export type PaperLength = "short" | "standard" | "long";
+export type Approach = "facts" | "bothSides" | "argue" | "custom";
+export type SourceMix = "studies" | "official" | "mix" | "custom";
+
+/** The student's directions from the Start questions; the AI writes the paper to match. */
+export interface Brief {
+  length: PaperLength;
+  approach: Approach;
+  /** The student's own words when approach is "custom". */
+  approachText: string;
+  sources: SourceMix;
+  sourcesText: string;
+  style: "apa" | "mla" | "ieee";
+  /** Anything else the paper must cover. */
+  extra: string;
+  /** The AI's multiple-choice questions and the student's answers, in order. */
+  interview?: { question: string; answer: string }[];
+}
 
 export interface Angle {
   id: string;
@@ -93,6 +111,7 @@ export interface Project {
   notes: Note[];
   sections: Section[];
   gaps: Gap[];
+  brief?: Brief;
   /** The paper's abstract and keywords, written by AI once every section has text. */
   abstract?: string;
   keywords?: string[];

@@ -5,7 +5,7 @@ import { fixAllGrammar } from "../checks";
 import { addNote, addSourceNote, addSources, applyOutline, fillIfEmpty, needsSearch, notesFor, saveNoteSources, savedSources, setQuestion } from "../project";
 import { projectStore } from "../store";
 import { toSource } from "../sources";
-import type { Locale, Project, Section, Source } from "../types";
+import type { Approach, Brief, Locale, PaperLength, Project, Section, Source, SourceMix } from "../types";
 
 export const AUTOPILOT_STAGES = ["plan", "sources", "notes", "outline", "draft", "polish", "abstract"] as const;
 export type AutopilotStage = (typeof AUTOPILOT_STAGES)[number];
@@ -27,10 +27,36 @@ export interface AutopilotResult {
   limited: boolean;
 }
 
-/** How many found sources the AI keeps for the paper. */
-const MAX_SAVED = 6;
-const SOURCE_PAGES = 2;
+/** How many found sources the AI keeps, and how many pages of search it reads, for each paper length. */
+const MAX_SAVED: Record<PaperLength, number> = { short: 4, standard: 6, long: 8 };
+const SOURCE_PAGES: Record<PaperLength, number> = { short: 1, standard: 2, long: 3 };
 const DRAFT_CONCURRENCY = 3;
+
+// Prompt text for the Start answers. These go to the AI, so they stay in English whatever the app language.
+const APPROACH_PROMPT: Record<Exclude<Approach, "custom">, string> = {
+  facts: "Explain the facts clearly and neutrally.",
+  bothSides: "Compare the different sides fairly and weigh the evidence for each.",
+  argue: "Take a clear position that answers the question, and back it with the evidence.",
+};
+const SOURCES_PROMPT: Record<Exclude<SourceMix, "custom">, string> = {
+  studies: "mostly peer-reviewed scientific studies",
+  official: "mostly government and university websites",
+  mix: "a balanced mix of scientific studies, official sites and reputable news",
+};
+
+/** The student's directions as one note for the writing agents. */
+export function briefDirections(brief: Brief | undefined): string {
+  if (!brief) return "";
+  const approach = brief.approach === "custom" ? brief.approachText.trim() : APPROACH_PROMPT[brief.approach];
+  const extra = brief.extra.trim() ? `Make sure the paper covers: ${brief.extra.trim()}` : "";
+  const interview = (brief.interview ?? []).map((a) => `Q: ${a.question} A: ${a.answer}`).join("\n");
+  return [interview && `What the student chose:\n${interview}`, approach, extra].filter(Boolean).join("\n").slice(0, 1500);
+}
+
+function sourcePreference(brief: Brief | undefined): string {
+  if (!brief) return "";
+  return (brief.sources === "custom" ? brief.sourcesText.trim() : SOURCES_PROMPT[brief.sources]).slice(0, 400);
+}
 const TRUST_ORDER: Record<Source["trust"], number> = { trusted: 0, check: 1, careful: 2 };
 
 export function sectionName(s: Section, labels: SectionLabels): string {
@@ -48,6 +74,8 @@ export function draftRequest(project: Project, target: Section, locale: Locale, 
     writingType: project.writingType,
     grade: project.grade,
     locale,
+    length: project.brief?.length ?? "standard",
+    directions: briefDirections(project.brief),
     section: { kind: target.kind, title: sectionName(target, labels).slice(0, 120), keyPoint: target.keyPoint?.slice(0, 500) ?? null },
     outline: project.sections.slice(0, 20).map((s) => sectionName(s, labels).slice(0, 120)),
     notes: notesFor(project, target.id)
@@ -113,10 +141,12 @@ export async function runAutopilot(
   // 2. Find sources.
   onProgress({ stage: "sources" });
   p = current();
+  const length = p?.brief?.length ?? "standard";
   if (p && needsSearch(p)) {
     const question = p.question ?? p.topic;
-    for (let page = 1; page <= SOURCE_PAGES; page++) {
-      const result = await callAgent("sources", { question, topic: p.topic, grade: p.grade, locale, page });
+    const preference = sourcePreference(p.brief);
+    for (let page = 1; page <= SOURCE_PAGES[length]; page++) {
+      const result = await callAgent("sources", { question, topic: p.topic, grade: p.grade, locale, page, preference });
       if (!result.ok) {
         if (page === 1) throw new Error("sources_failed");
         break;
@@ -136,7 +166,7 @@ export async function runAutopilot(
     const picks = p.sources
       .filter((s) => s.trust !== "careful")
       .sort((a, b) => TRUST_ORDER[a.trust] - TRUST_ORDER[b.trust])
-      .slice(0, MAX_SAVED);
+      .slice(0, MAX_SAVED[length]);
     if (picks.length === 0) limited = true;
     update((x) =>
       picks.reduce((next, s) => {
@@ -157,6 +187,8 @@ export async function runAutopilot(
       writingType: snapshot.writingType,
       grade: snapshot.grade,
       locale,
+      length,
+      directions: briefDirections(snapshot.brief),
       notes: snapshot.notes.slice(0, 80).map((n) => ({
         id: n.id,
         text: n.text.slice(0, 1000),

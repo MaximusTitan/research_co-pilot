@@ -6,14 +6,14 @@ import { RequireProject } from "../../components/shell";
 import { useAuthUser } from "../../components/auth-provider";
 import { PaperPages, type PaperPagesMeta } from "../../components/paper-pages";
 import { abstractRequest } from "../../lib/client/autopilot";
-import { citedRefs, type CitationStyle } from "../../lib/citations";
+import { CITATION_STYLES, citedRefs, type CitationStyle } from "../../lib/citations";
 import { buildPaper, paperToText } from "../../lib/paper";
 import { callAgent } from "../../lib/client/agent";
 import { useFlash } from "../../lib/client/hooks";
 import { applyFix, checkGrammar, fixAllGrammar as fixGrammarText, checkOriginality, verifyCitations, type CitationProblem, type Issue } from "../../lib/checks";
 import { useLocale, useT } from "../../lib/i18n";
 import type { Dictionary } from "../../lib/i18n/en";
-import { fullDraft, replaceInDrafts, savedSources } from "../../lib/project";
+import { DEFAULT_BRIEF, fullDraft, replaceInDrafts, savedSources } from "../../lib/project";
 import { projectStore } from "../../lib/store";
 import { sentences } from "../../lib/text";
 import type { Project, Section } from "../../lib/types";
@@ -70,7 +70,10 @@ function issueText(t: Dictionary, issue: Issue): string {
 function Review({ project }: { project: Project }) {
   const t = useT();
   const locale = useLocale();
-  const [style, setStyle] = useState<CitationStyle>("apa");
+  // The style the student picked at the start; changing it here is saved with the project.
+  const style: CitationStyle = project.brief?.style ?? "apa";
+  const setStyle = (next: CitationStyle) =>
+    projectStore.update((p) => ({ ...p, brief: { ...(p.brief ?? DEFAULT_BRIEF), style: next } }), { touch: false });
   const [claims, setClaims] = useState<ClaimResult[] | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -206,7 +209,7 @@ function Review({ project }: { project: Project }) {
     );
   }
 
-  const paperLabels = { abstract: t.review.abstract, keywords: t.review.keywords, intro: t.outline.intro, conclusion: t.outline.conclusion, references: t.review.references };
+  const paperLabels = { abstract: t.review.abstract, keywords: t.review.keywords, intro: t.outline.intro, conclusion: t.outline.conclusion, references: t.review.references, worksCited: t.review.worksCited };
   const paper = buildPaper(project, paperLabels, style);
   const hasPaper = paper.sections.length > 0;
   const meta: PaperPagesMeta = {
@@ -311,13 +314,24 @@ function Review({ project }: { project: Project }) {
                 : t.review.yourPaperHelp}
               {writingAbstract ? ` · ${t.generate.stages.abstract}…` : ""}
             </p>
-            <div role="group" aria-label={t.review.referenceStyle} className="flex items-center gap-1">
-              <span className="mr-1 text-sm text-[var(--ink-muted)]">{t.review.referenceStyle}</span>
-              {(["apa", "mla"] as const).map((s) => (
-                <Button key={s} aria-pressed={style === s} variant={style === s ? "primary" : "secondary"} className="min-h-9 px-3 text-sm uppercase" onClick={() => setStyle(s)}>
-                  {s}
-                </Button>
-              ))}
+            <div className="flex items-center gap-2" title={t.review.styleHelp}>
+              <span id="style-label" className="text-sm text-[var(--ink-muted)]">{t.review.citationStyle}</span>
+              <div role="group" aria-labelledby="style-label" aria-describedby="style-help" className="flex rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] p-0.5 shadow-[var(--shadow-sm)]">
+                {CITATION_STYLES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={style === s}
+                    onClick={() => setStyle(s)}
+                    className={`min-h-9 rounded-md px-3 text-sm font-semibold uppercase transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)] ${
+                      style === s ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <span id="style-help" className="sr-only">{t.review.styleHelp}</span>
             </div>
           </div>
           {hasPaper ? (

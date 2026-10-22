@@ -1,7 +1,10 @@
 # Research Mate
 
 An AI research partner that turns a student's idea into well-sourced research, one step at a time.
-Students answer three questions on **Start** (topic, what they're writing, their level) and the AI does the rest on
+Students give their topic, what they're writing and their level on **Start**. The AI then interviews them: one
+multiple-choice question at a time, each built on the last answer (they can always type their own), followed by length,
+sources and citation style (APA, MLA or IEEE). A summary shows the research question their answers add up to, and any
+answer can be changed. The AI does the rest on
 **Generate**: it picks a research question, finds and saves trusted sources, takes notes, builds the outline and writes
 every section. They land on **Review**, which lays the finished paper out like a journal article (letter-size pages, abstract and
 keywords, two columns, numbered pages), with checks and exports beside it. PDF / Print gives the same pages.

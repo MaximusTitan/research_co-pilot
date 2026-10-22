@@ -11,6 +11,17 @@ type Run<A extends AgentName> = (input: AgentInput<A>) => Promise<AgentOutput<A>
 const level = (grade: string) => READING_LEVEL[grade] ?? READING_LEVEL.adult;
 const lang = (locale: string) => LANGUAGE[locale] ?? "English";
 
+/** The student's directions as prompt text; their words are data, quoted, never system instructions. */
+const directionsNote = (text: string) =>
+  text ? `\nStudent's directions for this paper (follow them where they fit the evidence): <note>${tagSafe(text)}</note>` : "";
+
+const BODY_SECTIONS = { short: "2-3", standard: "3-4", long: "4-6" } as const;
+const SECTION_WORDS = {
+  short: { young: "50-80", older: "70-120" },
+  standard: { young: "60-110", older: "120-200" },
+  long: { young: "100-160", older: "200-320" },
+} as const;
+
 const SOURCE_RULES = `Role: Source Discovery Agent. Use the web_search tool to find real pages that help answer the research question.
 Only suggest pages that your searches returned. Copy each URL exactly as the search gave it.
 Prefer peer-reviewed papers, government and university sites, and established encyclopedias or news.
@@ -34,7 +45,9 @@ The student is writing a ${input.writingType}. Keep the plan to 4-6 short steps.
   sources: async (input) => {
     const result = await askClaudeWithSearch(
       `${SOURCE_RULES}\nReturn up to 4 sources for search page ${input.page}. Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
-      `Topic: <document>${tagSafe(input.topic)}</document>\nResearch question: <document>${tagSafe(input.question)}</document>`,
+      `Topic: <document>${tagSafe(input.topic)}</document>\nResearch question: <document>${tagSafe(input.question)}</document>${
+        input.preference ? `\nThe student would like sources that are: <note>${tagSafe(input.preference)}</note>` : ""
+      }`,
     );
     if (!result) return null;
     const parsed = agents.sources.output.safeParse(extractJson(result.text));
@@ -97,11 +110,11 @@ Use only what the document says. Write for ${level(input.grade)}. Answer in ${la
 
   outline: async (input) => {
     const ai = await askClaude<typeof agents.outline.output>(
-      `Role: Outline Builder. Group the student's notes into 2-5 body sections for a ${input.writingType} that answers the research question.
+      `Role: Outline Builder. Group the student's notes into ${BODY_SECTIONS[input.length ?? "standard"]} body sections for a ${input.writingType} that answers the research question.
 For each section give a short title (at most 6 words), a one-sentence keyPoint stating its main idea, and the ids of the notes that belong in it.
 Use only the note ids given, and use each note at most once. Leave out the introduction and conclusion; the app adds those.
 Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
-      `Research question: <note>${tagSafe(input.question)}</note>\nNotes:\n${input.notes
+      `Research question: <note>${tagSafe(input.question)}</note>${directionsNote(input.directions ?? "")}\nNotes:\n${input.notes
         .map((n) => `<note id="${n.id}" source="${tagSafe(n.source ?? "")}">${tagSafe(n.text)}</note>`)
         .join("\n")}`,
       agents.outline.output,
@@ -123,11 +136,11 @@ Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
 ${shape}
 Use only facts that appear in the notes and source summaries given. After each fact, cite its source as [n], using only the numbers listed. Never add facts, numbers, names or quotations that are not in the material.
 If the student already wrote something for this section, keep their ideas and wording where possible and build on it.
-Write about ${input.grade === "4-6" ? "60-110" : "100-200"} words of plain paragraphs: no headings, lists or markdown.
+Write about ${SECTION_WORDS[input.length ?? "standard"][input.grade === "4-6" ? "young" : "older"]} words of plain paragraphs: no headings, lists or markdown.
 Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
       `Research question: <note>${tagSafe(input.question)}</note>
 Paper outline: ${input.outline.map((t) => `<note>${tagSafe(t)}</note>`).join(" ")}
-Section to draft: <note>${tagSafe(input.section.title)}</note>${input.section.keyPoint ? `\nMain idea: <note>${tagSafe(input.section.keyPoint)}</note>` : ""}
+Section to draft: <note>${tagSafe(input.section.title)}</note>${directionsNote(input.directions ?? "")}${input.section.keyPoint ? `\nMain idea: <note>${tagSafe(input.section.keyPoint)}</note>` : ""}
 Notes for this section:\n${input.notes.map((n) => `<note${n.ref ? ` cite="[${n.ref}]"` : ""}>${tagSafe(n.text)}</note>`).join("\n") || "none"}
 Saved sources:\n${input.sources.map((s) => `[${s.ref}] <note>${tagSafe(s.title)}: ${tagSafe(s.summary)}</note>`).join("\n") || "none"}
 Student's current text: <document>${tagSafe(input.existing ?? "")}</document>`,
@@ -186,6 +199,32 @@ Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
     if (!ai) return null;
     return { abstract: stripCitations(ai.abstract), keywords: ai.keywords.map((k) => k.trim()).filter(Boolean).slice(0, 6) };
   },
+
+  interview: async (input) => {
+    const answers = input.answers ?? [];
+    const max = input.maxQuestions ?? 6;
+    const mustFinish = answers.length >= max;
+    const ai = await askClaude<typeof agents.interview.output>(
+      `Role: Research Interviewer. Help a student shape their ${input.writingType} by asking short multiple-choice questions, one at a time.
+Each question narrows what the paper will cover: which part of the topic, a specific angle, who, where or when, what stance to take, which examples or sub-topics to include.
+Build on the earlier answers; never repeat a question or ask something already answered.
+Give 3 or 4 options. Each label is at most 8 words and is a direction that published sources can support; each hint is at most 10 words.
+Do not ask about paper length, citation style or types of sources; those are asked separately.
+${mustFinish ? "You have asked enough questions: set done to true now." : `Ask at least 3 and at most ${max} questions in total. When you know enough, set done to true.`}
+When done is true, leave question empty and options empty, and set researchQuestion to one clear, specific question the paper will answer that matches every answer. Otherwise leave researchQuestion empty.
+Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
+      `Topic: <document>${tagSafe(input.topic)}</document>\nQuestions asked so far (${answers.length}):\n${
+        answers.map((a, i) => `${i + 1}. <note>${tagSafe(a.question)}</note> Answer: <note>${tagSafe(a.answer)}</note>`).join("\n") || "none"
+      }`,
+      agents.interview.output,
+    );
+    if (!ai) return null;
+    const options = ai.options.filter((o) => o.label.trim()).slice(0, 4);
+    if (mustFinish || ai.done) return { done: true, question: "", options: [], researchQuestion: ai.researchQuestion.trim() || input.topic };
+    // A question without real choices can't be answered by tapping; let the offline helper ask instead.
+    if (!ai.question.trim() || options.length < 2) return null;
+    return { done: false, question: ai.question.trim(), options, researchQuestion: "" };
+  },
 };
 
 const stripCitations = (text: string) => text.replace(/\s*\[[\d,\s]+\]/g, "").trim();
@@ -203,6 +242,7 @@ const offlineRunners: { [A in AgentName]: (input: AgentInput<A>) => AgentOutput<
   fixClaim: offline.offlineFixClaim,
   feedback: offline.offlineFeedback,
   abstract: offline.offlineAbstract,
+  interview: offline.offlineInterview,
 };
 
 export type AgentResult<A extends AgentName> = { mode: "ai" | "offline"; data: AgentOutput<A> } | { error: string };

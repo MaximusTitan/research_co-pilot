@@ -1,5 +1,5 @@
 import { newId } from "./text";
-import type { GradeBand, Note, Project, Section, SectionKind, Source, WritingType } from "./types";
+import type { Brief, GradeBand, Note, Project, Section, SectionKind, Source, WritingType } from "./types";
 
 export interface NewProjectInput {
   topic: string;
@@ -8,6 +8,9 @@ export interface NewProjectInput {
   introTitle: string;
   conclusionTitle: string;
 }
+
+/** Directions for projects started before the Start questions existed. */
+export const DEFAULT_BRIEF: Brief = { length: "standard", approach: "facts", approachText: "", sources: "mix", sourcesText: "", style: "apa", extra: "" };
 
 export function createProject(input: NewProjectInput, now = Date.now()): Project {
   return {
