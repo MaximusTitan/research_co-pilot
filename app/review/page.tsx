@@ -7,7 +7,7 @@ import { useAuthUser } from "../../components/auth-provider";
 import { PaperPages, type PaperPagesMeta } from "../../components/paper-pages";
 import { abstractRequest } from "../../lib/client/autopilot";
 import { CITATION_STYLES, citedRefs, type CitationStyle } from "../../lib/citations";
-import { buildPaper, paperToText } from "../../lib/paper";
+import { buildPaper, paperToText, showsHeadings } from "../../lib/paper";
 import { callAgent } from "../../lib/client/agent";
 import { useFlash } from "../../lib/client/hooks";
 import { applyFix, checkGrammar, fixAllGrammar as fixGrammarText, checkOriginality, verifyCitations, type CitationProblem, type Issue } from "../../lib/checks";
@@ -17,6 +17,7 @@ import { DEFAULT_BRIEF, fullDraft, replaceInDrafts, savedSources } from "../../l
 import { projectStore } from "../../lib/store";
 import { sentences } from "../../lib/text";
 import type { Project, Section } from "../../lib/types";
+import { WRITING } from "../../lib/writing";
 
 type Verdict = "supported" | "partial" | "unsupported";
 interface ClaimResult {
@@ -222,8 +223,8 @@ function Review({ project }: { project: Project }) {
     lang: locale,
   };
 
-  // Papers written before abstracts existed, or by hand, get one the first time they're opened here.
-  const needsAbstract = hasPaper && !project.abstract;
+  // Research papers written before abstracts existed, or by hand, get one the first time they're opened here.
+  const needsAbstract = hasPaper && WRITING[project.writingType].abstract && !project.abstract;
   const writeAbstract = useEffectEvent(async () => {
     setWritingAbstract(true);
     const result = await callAgent("abstract", abstractRequest(project, locale, { intro: t.outline.intro, conclusion: t.outline.conclusion }));
@@ -247,7 +248,7 @@ function Review({ project }: { project: Project }) {
 
   function exportWord() {
     const body = paper.sections
-      .map((s) => `<h2>${escapeHtml(s.heading)}</h2>${s.paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`).join("")}`)
+      .map((s) => `${showsHeadings(paper) ? `<h2>${escapeHtml(s.heading)}</h2>` : ""}${s.paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`).join("")}`)
       .join("");
     const refs = paper.references.length
       ? `<h2>${escapeHtml(paper.referencesTitle)}</h2>${paper.references.map((r) => `<p>${escapeHtml(r)}</p>`).join("")}`

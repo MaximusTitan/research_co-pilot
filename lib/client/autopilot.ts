@@ -5,10 +5,14 @@ import { fixAllGrammar } from "../checks";
 import { addNote, addSourceNote, addSources, applyOutline, fillIfEmpty, needsSearch, notesFor, saveNoteSources, savedSources, setQuestion } from "../project";
 import { projectStore } from "../store";
 import { toSource } from "../sources";
-import type { Approach, Brief, Locale, PaperLength, Project, Section, Source, SourceMix } from "../types";
+import type { Approach, Brief, Locale, Project, Section, Source, SourceMix, WritingType } from "../types";
+import { WRITING } from "../writing";
 
 export const AUTOPILOT_STAGES = ["plan", "sources", "notes", "outline", "draft", "polish", "abstract"] as const;
 export type AutopilotStage = (typeof AUTOPILOT_STAGES)[number];
+
+/** The steps the autopilot runs for this kind of writing; only research papers get an abstract. */
+export const stagesFor = (type: WritingType): AutopilotStage[] => AUTOPILOT_STAGES.filter((s) => s !== "abstract" || WRITING[type].abstract);
 
 export interface SectionLabels {
   intro: string;
@@ -27,9 +31,6 @@ export interface AutopilotResult {
   limited: boolean;
 }
 
-/** How many found sources the AI keeps, and how many pages of search it reads, for each paper length. */
-const MAX_SAVED: Record<PaperLength, number> = { short: 4, standard: 6, long: 8 };
-const SOURCE_PAGES: Record<PaperLength, number> = { short: 1, standard: 2, long: 3 };
 const DRAFT_CONCURRENCY = 3;
 
 // Prompt text for the Start answers. These go to the AI, so they stay in English whatever the app language.
@@ -145,7 +146,7 @@ export async function runAutopilot(
   if (p && needsSearch(p)) {
     const question = p.question ?? p.topic;
     const preference = sourcePreference(p.brief);
-    for (let page = 1; page <= SOURCE_PAGES[length]; page++) {
+    for (let page = 1; page <= WRITING[p.writingType].sourcePages[length]; page++) {
       const result = await callAgent("sources", { question, topic: p.topic, grade: p.grade, locale, page, preference });
       if (!result.ok) {
         if (page === 1) throw new Error("sources_failed");
@@ -166,7 +167,7 @@ export async function runAutopilot(
     const picks = p.sources
       .filter((s) => s.trust !== "careful")
       .sort((a, b) => TRUST_ORDER[a.trust] - TRUST_ORDER[b.trust])
-      .slice(0, MAX_SAVED[length]);
+      .slice(0, WRITING[p.writingType].maxSaved[length]);
     if (picks.length === 0) limited = true;
     update((x) =>
       picks.reduce((next, s) => {
@@ -227,10 +228,10 @@ export async function runAutopilot(
   onProgress({ stage: "polish" });
   update((x) => ({ ...x, sections: x.sections.map((s) => ({ ...s, draft: fixAllGrammar(s.draft, x.grade) })) }));
 
-  // 7. Write the abstract and keywords from the finished sections.
-  onProgress({ stage: "abstract" });
+  // 7. Research papers get an abstract and keywords from the finished sections.
   p = current();
-  if (p && !p.abstract && p.sections.some((s) => s.draft.trim())) {
+  if (p && WRITING[p.writingType].abstract) onProgress({ stage: "abstract" });
+  if (p && WRITING[p.writingType].abstract && !p.abstract && p.sections.some((s) => s.draft.trim())) {
     const result = await callAgent("abstract", abstractRequest(p, locale, labels));
     if (result.ok) {
       if (result.mode === "offline") limited = true;

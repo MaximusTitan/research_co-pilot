@@ -6,14 +6,13 @@ import { Logo } from "../components/logo";
 import { TrustBadge } from "../components/ui";
 import { useLocale, useT } from "../lib/i18n";
 import { updateSettings } from "../lib/settings";
-import type { GradeBand } from "../lib/types";
+import { GRADES } from "../lib/writing";
 
-const GRADES: GradeBand[] = ["4-6", "7-8", "9-10", "11-12", "adult"];
 
 const FEATURE_ICONS: ReactNode[] = [
   // Shield with a tick: trusted sources.
   <path key="0" d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6l-7-3Zm-3 9 2 2 4-4" />,
-  // Pencil: your own words.
+  // Pencil: the right kind of writing.
   <path key="1" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Zm9.5-13.5 4 4" />,
   // Magnifier with a tick: evidence check.
   <path key="2" d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Zm5.5-2 5 5M7.5 10.5l2 2 3.5-3.5" />,
@@ -21,8 +20,8 @@ const FEATURE_ICONS: ReactNode[] = [
   <path key="3" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-12.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM7.5 10l4.5 1 4.5-1M12 11v3l-2 3.5m2-3.5 2 3.5" />,
   // Speech bubbles: two languages.
   <path key="4" d="M4 5h10v7H8l-4 3V5Zm6 10v1h6l4 3v-9h-4" />,
-  // Cloud: saved to your account.
-  <path key="5" d="M7 18a4 4 0 0 1-.6-8A5.5 5.5 0 0 1 17 8.5a4.8 4.8 0 0 1 .5 9.5H7Z" />,
+  // Page with a download arrow: ready to hand in.
+  <path key="5" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M12 11v6m-3-3 3 3 3-3" />,
 ];
 
 export default function LandingPage() {
@@ -102,7 +101,7 @@ export default function LandingPage() {
         <section id="how" className="scroll-mt-20 border-y border-[var(--line)] bg-[var(--surface)] py-20 sm:py-24">
           <div className="mx-auto max-w-6xl px-4">
             <SectionHeading title={l.howTitle} body={l.howBody} />
-            <ol className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <ol className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {l.steps.map((step, i) => (
                 <li
                   key={step.title}

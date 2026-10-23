@@ -6,6 +6,7 @@ import { VoiceButton } from "./voice-button";
 import { callAgent } from "../lib/client/agent";
 import { useLocale, useT } from "../lib/i18n";
 import type { Brief, GradeBand, PaperLength, SourceMix, WritingType } from "../lib/types";
+import { maxPicks } from "../lib/writing";
 
 /** The AI asks at most this many of its own questions before the fixed ones. */
 const MAX_AI_QUESTIONS = 6;
@@ -20,10 +21,17 @@ interface Option {
 interface Asked {
   question: string;
   options: Option[];
+  /** The student may pick several options, up to the grade's limit. */
+  multi: boolean;
+  /** The earlier answer, when the student goes back to change it. */
+  previous?: string;
 }
 interface Answered extends Asked {
   answer: string;
 }
+
+/** Several picks go to the AI as one answer, separated like this. */
+const PICK_SEPARATOR = "; ";
 
 export interface InterviewResult {
   question: string;
@@ -90,7 +98,7 @@ export function Interview({
       setPhase(backToReview ? "review" : "length");
       setBackToReview(false);
     } else {
-      setCurrent({ question: result.data.question, options: result.data.options });
+      setCurrent({ question: result.data.question, options: result.data.options, multi: result.data.multi });
     }
   }
 
@@ -104,7 +112,7 @@ export function Interview({
 
   function answer(text: string) {
     if (!current || !text.trim()) return;
-    const list = [...answers, { ...current, answer: text.trim() }];
+    const list = [...answers, { question: current.question, options: current.options, multi: current.multi, answer: text.trim() }];
     setAnswers(list);
     void ask(list);
   }
@@ -114,7 +122,7 @@ export function Interview({
     request.current++;
     const target = answers[index];
     setAnswers(answers.slice(0, index));
-    setCurrent({ question: target.question, options: target.options });
+    setCurrent({ question: target.question, options: target.options, multi: target.multi, previous: target.answer });
     setStatus("ready");
     setPhase("ai");
   }
@@ -183,6 +191,7 @@ export function Interview({
     { label: "MLA", hint: "(Smith)" },
     { label: "IEEE", hint: "[1]" },
   ];
+  const picksAllowed = maxPicks(grade);
   const sourceLabel = sources === "custom" ? sourcesText : sourceOptions[sourceValues.indexOf(sources)].label;
 
   return (
@@ -216,7 +225,10 @@ export function Interview({
           failed={status === "failed"}
           onRetry={() => void ask(answers)}
           options={current?.options ?? []}
+          help={current?.multi ? t.interview.pickUpTo(picksAllowed) : undefined}
+          selected={current?.multi ? undefined : current?.previous}
           onPick={(o) => answer(o.label)}
+          multi={current?.multi ? { max: picksAllowed, initial: current.previous?.split(PICK_SEPARATOR) ?? [], onSubmit: (picks) => answer(picks.join(PICK_SEPARATOR)) } : undefined}
           own={{ placeholder: t.interview.ownPlaceholder, onSubmit: answer }}
           footer={
             answers.length >= 2 && status === "ready" ? (
@@ -342,6 +354,7 @@ function QuestionCard({
   options,
   selected,
   onPick,
+  multi,
   own,
   loading = false,
   failed = false,
@@ -355,6 +368,8 @@ function QuestionCard({
   options: Option[];
   selected?: string;
   onPick: (option: Option) => void;
+  /** Tapping toggles options, up to `max`, and Continue sends them all. */
+  multi?: { max: number; initial: string[]; onSubmit: (picks: string[]) => void };
   own?: { placeholder: string; onSubmit: (text: string) => void };
   loading?: boolean;
   failed?: boolean;
@@ -365,6 +380,13 @@ function QuestionCard({
   const t = useT();
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState("");
+  const [picks, setPicks] = useState<string[]>(() => (multi ? multi.initial.filter((p) => options.some((o) => o.label === p)) : []));
+  const full = multi ? picks.length >= multi.max : false;
+
+  function choose(o: Option) {
+    if (!multi) return onPick(o);
+    setPicks((prev) => (prev.includes(o.label) ? prev.filter((p) => p !== o.label) : prev.length < multi.max ? [...prev, o.label] : prev));
+  }
 
   return (
     <section aria-live="polite" className="fade-up rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-md)] sm:p-6">
@@ -387,24 +409,26 @@ function QuestionCard({
           {help ? <p className="mt-1 text-sm text-[var(--ink-muted)]">{help}</p> : null}
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {options.map((o, i) => {
-              const isSelected = selected === o.label;
+              const isSelected = multi ? picks.includes(o.label) : selected === o.label;
+              const blocked = full && !isSelected;
               return (
                 <button
                   key={o.label}
                   type="button"
-                  onClick={() => onPick(o)}
-                  aria-pressed={selected !== undefined ? isSelected : undefined}
-                  className={`group flex min-h-16 items-start gap-3 rounded-xl border-2 p-3 text-left transition-[background-color,border-color,box-shadow,scale] duration-150 active:scale-[0.98] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] ${
-                    isSelected ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                  onClick={() => choose(o)}
+                  disabled={blocked}
+                  aria-pressed={multi || selected !== undefined ? isSelected : undefined}
+                  className={`group flex min-h-16 items-start gap-3 rounded-xl border-2 p-3 text-left transition-[background-color,border-color,box-shadow,scale,opacity] duration-150 active:scale-[0.98] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${
+                    isSelected ? "border-[var(--accent)] bg-[var(--accent-soft)]" : blocked ? "border-[var(--line)] bg-[var(--surface)]" : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
                   }`}
                 >
                   <span
                     aria-hidden
-                    className={`grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold transition-colors ${
-                      isSelected ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "bg-[var(--surface-2)] text-[var(--ink-muted)] group-hover:bg-[var(--accent)] group-hover:text-[var(--accent-fg)]"
+                    className={`grid size-7 shrink-0 place-items-center text-sm font-bold transition-colors ${multi ? "rounded-md" : "rounded-lg"} ${
+                      isSelected ? "bg-[var(--accent)] text-[var(--accent-fg)]" : blocked ? "bg-[var(--surface-2)] text-[var(--ink-muted)]" : "bg-[var(--surface-2)] text-[var(--ink-muted)] group-hover:bg-[var(--accent)] group-hover:text-[var(--accent-fg)]"
                     }`}
                   >
-                    {String.fromCharCode(65 + i)}
+                    {multi && isSelected ? "✓" : String.fromCharCode(65 + i)}
                   </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="font-semibold">{o.label}</span>
@@ -415,13 +439,23 @@ function QuestionCard({
             })}
           </div>
 
+          {multi ? (
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-sm tabular-nums text-[var(--ink-muted)]">{t.interview.picked(picks.length, multi.max)}</span>
+              <Button variant="primary" disabled={picks.length === 0} onClick={() => multi.onSubmit(picks)}>
+                {t.interview.continue} →
+              </Button>
+            </div>
+          ) : null}
+
           {own ? (
             typing ? (
               <form
                 className="fade-up mt-3 flex items-center gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (text.trim()) own.onSubmit(text.trim());
+                  // On a multi-select question, the typed answer joins whatever was picked.
+                  if (text.trim()) own.onSubmit([...picks, text.trim()].join(PICK_SEPARATOR));
                 }}
               >
                 <input aria-label={own.placeholder} className={inputClass} value={text} maxLength={300} placeholder={own.placeholder} onChange={(e) => setText(e.target.value)} autoFocus />

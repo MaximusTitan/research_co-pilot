@@ -1,5 +1,5 @@
 export type WritingType = "essay" | "report" | "paper";
-export type GradeBand = "4-6" | "7-8" | "9-10" | "11-12" | "adult";
+export type GradeBand = "4-6" | "7-8" | "9-10" | "11-12";
 export type Trust = "trusted" | "check" | "careful";
 export type SourceKind =
   | "paper"

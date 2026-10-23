@@ -4,8 +4,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Paper } from "../lib/paper";
 
 /**
- * The finished paper laid out like a journal article: US Letter pages, a title
- * block, an abstract, two justified columns and numbered pages. Text is
+ * The finished paper on US Letter pages with a title block and numbered pages.
+ * A research paper is laid out like a journal article (abstract, two justified
+ * columns, Roman-numeral headings); a report and an essay use one column, the
+ * report with numbered headings and the essay with none. Text is
  * measured and split across columns and pages the way a typesetter would, at
  * full size, then the pages are scaled to fit the screen. Printing shows the
  * same pages at real size.
@@ -17,7 +19,9 @@ const MARGIN_X = 60;
 const MARGIN_TOP = 72;
 const MARGIN_BOTTOM = 72;
 const GAP = 24;
-const COL_W = (PAGE_W - 2 * MARGIN_X - GAP) / 2;
+const TEXT_W = PAGE_W - 2 * MARGIN_X;
+const columnsFor = (layout: Paper["layout"]) => (layout === "journal" ? 2 : 1);
+const colWidth = (cols: number) => (TEXT_W - (cols - 1) * GAP) / cols;
 const BODY_H = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
 const MAX_SCALE = 1.25;
 
@@ -43,7 +47,8 @@ interface Piece {
   /** First paragraph after a heading: no indent, as in print. */
   first?: boolean;
 }
-type Page = [Piece[], Piece[]];
+/** One list of pieces per column. */
+type Page = Piece[][];
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
 
@@ -80,7 +85,14 @@ function toPieces(paper: Paper): Piece[] {
   if (paper.abstract) out.push({ kind: "abstract", text: paper.abstract });
   if (paper.keywords.length) out.push({ kind: "keywords", text: paper.keywords.join(", ") });
   paper.sections.forEach((s, i) => {
-    out.push({ kind: "heading", text: `${ROMAN[i] ?? i + 1}. ${s.heading}`, id: `paper-section-${i}` });
+    const id = `paper-section-${i}`;
+    if (paper.layout === "essay") {
+      // No headings: the section's first paragraph is what the contents link jumps to.
+      s.paragraphs.forEach((text, j) => out.push({ kind: "para", text, id: j === 0 ? id : undefined }));
+      return;
+    }
+    const number = paper.layout === "journal" ? (ROMAN[i] ?? String(i + 1)) : String(i + 1);
+    out.push({ kind: "heading", text: `${number}. ${s.heading}`, id });
     s.paragraphs.forEach((text, j) => out.push({ kind: "para", text, first: j === 0 }));
   });
   if (paper.references.length) {
@@ -95,16 +107,17 @@ function toPieces(paper: Paper): Piece[] {
  * runs out. Columns on page `capPage` are no taller than `cap`, which is how
  * the last page gets balanced columns.
  */
-function paginate(pieces: Piece[], firstHeight: number, measure: (p: Piece) => number, line: number, capPage = -1, cap = Infinity): Page[] {
-  const pages: Page[] = [[[], []]];
+function paginate(pieces: Piece[], cols: number, firstHeight: number, measure: (p: Piece) => number, line: number, capPage = -1, cap = Infinity): Page[] {
+  const blank = (): Page => Array.from({ length: cols }, () => []);
+  const pages: Page[] = [blank()];
   let col = 0;
   const heightOf = (page: number) => Math.min(page === 0 ? firstHeight : BODY_H, page === capPage ? cap : Infinity);
   let avail = heightOf(0);
   const current = () => pages[pages.length - 1][col];
   const next = () => {
-    if (col === 0) col = 1;
+    if (col < cols - 1) col++;
     else {
-      pages.push([[], []]);
+      pages.push(blank());
       col = 0;
     }
     avail = heightOf(pages.length - 1);
@@ -164,6 +177,8 @@ export function PaperPages({ paper, meta }: { paper: Paper; meta: PaperPagesMeta
 
   const labels = useMemo(() => ({ abstract: meta.abstractLabel, keywords: meta.keywordsLabel }), [meta.abstractLabel, meta.keywordsLabel]);
   const head = headerHtml(paper, meta);
+  const cols = columnsFor(paper.layout);
+  const colW = colWidth(cols);
   const key = JSON.stringify([paper, head, labels]);
 
   useLayoutEffect(() => {
@@ -178,20 +193,20 @@ export function PaperPages({ paper, meta }: { paper: Paper; meta: PaperPagesMeta
     const headerH = h.getBoundingClientRect().height;
     const pieces = toPieces(JSON.parse(key)[0] as Paper);
     const firstH = BODY_H - headerH;
-    let pages = paginate(pieces, firstH, measure, line);
-    // Balance the last page: the shortest column height that still fits everything on it.
-    const last = pages.length - 1;
+    let pages = paginate(pieces, cols, firstH, measure, line);
+    // Balance the last page of a two-column layout: the shortest column height that still fits everything on it.
+    const last = cols > 1 ? pages.length - 1 : -1;
     let lo = line * 2;
     let hi = last === 0 ? firstH : BODY_H;
-    while (hi - lo > line / 2) {
+    while (last >= 0 && hi - lo > line / 2) {
       const mid = (lo + hi) / 2;
-      if (paginate(pieces, firstH, measure, line, last, mid).length === pages.length) hi = mid;
+      if (paginate(pieces, cols, firstH, measure, line, last, mid).length === pages.length) hi = mid;
       else lo = mid;
     }
-    pages = paginate(pieces, firstH, measure, line, last, hi);
+    if (last >= 0) pages = paginate(pieces, cols, firstH, measure, line, last, hi);
     m.innerHTML = "";
     setLayout({ pages, headerH });
-  }, [key, labels]);
+  }, [key, labels, cols]);
 
   useLayoutEffect(() => {
     const el = outer.current;
@@ -206,11 +221,11 @@ export function PaperPages({ paper, meta }: { paper: Paper; meta: PaperPagesMeta
   const total = layout?.pages.length ?? 0;
 
   return (
-    <div ref={outer} className="pp-stack" lang={meta.lang}>
+    <div ref={outer} className={`pp-stack pp-${paper.layout}`} lang={meta.lang}>
       {/* Off-screen copies at full size, used only to measure text. */}
       <div aria-hidden className="pp-measure">
-        <div ref={measurer} className="pp-col" style={{ width: COL_W }} />
-        <div ref={header} className="pp-head" style={{ width: PAGE_W - 2 * MARGIN_X }} dangerouslySetInnerHTML={{ __html: head }} />
+        <div ref={measurer} className="pp-col" style={{ width: colW }} />
+        <div ref={header} className="pp-head" style={{ width: TEXT_W }} dangerouslySetInnerHTML={{ __html: head }} />
       </div>
 
       {layout?.pages.map((cols, i) => {
@@ -229,7 +244,7 @@ export function PaperPages({ paper, meta }: { paper: Paper; meta: PaperPagesMeta
                 <div
                   key={c}
                   className="pp-col"
-                  style={{ position: "absolute", top, left: MARGIN_X + c * (COL_W + GAP), width: COL_W, height: PAGE_H - top - MARGIN_BOTTOM }}
+                  style={{ position: "absolute", top, left: MARGIN_X + c * (colW + GAP), width: colW, height: PAGE_H - top - MARGIN_BOTTOM }}
                   dangerouslySetInnerHTML={{ __html: pieces.map((p) => pieceHtml(p, labels, true)).join("") }}
                 />
               ))}

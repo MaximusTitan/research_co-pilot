@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { deleteProject, fetchProjects, saveProjects } from "./db/projects";
 import { supabaseBrowser } from "./supabase/client";
 import type { Project } from "./types";
+import { normalizeGrade } from "./writing";
 
 /** Projects saved in this browser before accounts existed; moved into the first account that signs in here. */
 const LEGACY_KEY = "research-copilot:v1";
@@ -87,7 +88,7 @@ function readLegacy(): Project[] {
     const raw = window.localStorage.getItem(LEGACY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { projects?: Record<string, Project> };
-    return parsed?.projects && typeof parsed.projects === "object" ? Object.values(parsed.projects) : [];
+    return parsed?.projects && typeof parsed.projects === "object" ? Object.values(parsed.projects).map((p) => ({ ...p, grade: normalizeGrade(p.grade) })) : [];
   } catch {
     return [];
   }
