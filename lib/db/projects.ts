@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Project } from "../types";
+import { normalizeGrade } from "../writing";
 
 /** A row of public.projects (see supabase/schema.sql). The whole project lives in `data`. */
 export interface ProjectRow {
@@ -18,7 +19,7 @@ export function rowToProject(row: ProjectRow): Project | null {
   const p = data as Partial<Project>;
   if (p.id !== row.id || typeof p.topic !== "string") return null;
   if (!ARRAY_FIELDS.every((f) => Array.isArray(p[f]))) return null;
-  return p as Project;
+  return { ...p, grade: normalizeGrade(p.grade) } as Project;
 }
 
 /** Columns written on save. `user_id` is filled by the database from the session, never by the browser. */

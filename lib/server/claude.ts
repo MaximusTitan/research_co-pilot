@@ -36,7 +36,6 @@ export const READING_LEVEL: Record<string, string> = {
   "7-8": "ages 12-14 (grades 7-8): clear, simple sentences",
   "9-10": "ages 14-16 (grades 9-10)",
   "11-12": "ages 16-18 (grades 11-12)",
-  adult: "university students and adults",
 };
 
 export const LANGUAGE: Record<string, string> = { en: "English", hi: "Hindi (Devanagari script)" };

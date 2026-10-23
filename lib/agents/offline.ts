@@ -371,6 +371,9 @@ const INTERVIEW_TEXT: Record<L, { focus: (c: string) => string; audience: string
   },
 };
 
+/** Which of the purposes fit each kind of writing: essays argue, reports explain. */
+const PURPOSES: Record<AgentInput<"interview">["writingType"], number[]> = { essay: [1, 2, 3], report: [0, 3], paper: [0, 1, 2, 3] };
+
 /**
  * Without AI: three fixed questions (which part of the topic, who it's for,
  * what it should do), then the research question of the chosen angle.
@@ -382,10 +385,10 @@ export function offlineInterview(input: AgentInput<"interview">): AgentOutput<"i
   const steps = [
     { question: text.focus(corePhrase(input.topic).toLowerCase()), options: angles.map((a) => ({ label: a.title, hint: a.questions[0] })) },
     { question: text.audience, options: text.audiences.map(([label, hint]) => ({ label, hint })) },
-    { question: text.purpose, options: text.purposes.map(([label, hint]) => ({ label, hint })) },
+    { question: text.purpose, options: text.purposes.filter((_, i) => PURPOSES[input.writingType].includes(i)).map(([label, hint]) => ({ label, hint })) },
   ];
   const next = steps[answers.length];
-  if (next && answers.length < (input.maxQuestions ?? 6)) return { done: false, ...next, researchQuestion: "" };
+  if (next && answers.length < (input.maxQuestions ?? 6)) return { done: false, ...next, multi: false, researchQuestion: "" };
   const chosen = angles.find((a) => a.title === answers[0]?.answer);
-  return { done: true, question: "", options: [], researchQuestion: chosen?.questions[0] ?? answers[0]?.answer ?? input.topic };
+  return { done: true, question: "", options: [], multi: false, researchQuestion: chosen?.questions[0] ?? answers[0]?.answer ?? input.topic };
 }

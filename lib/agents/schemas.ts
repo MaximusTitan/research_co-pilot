@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const locale = z.enum(["en", "hi"]);
-const grade = z.enum(["4-6", "7-8", "9-10", "11-12", "adult"]);
+const grade = z.enum(["4-6", "7-8", "9-10", "11-12"]);
 const shortText = z.string().trim().min(1).max(500);
 const paperLength = z.enum(["short", "standard", "long"]);
 /** The student's own directions from the Start questions, passed on to the writing agents. */
@@ -225,11 +225,13 @@ export const feedbackOutput = z.object({
 
 export const abstractOutput = z.object({ abstract: z.string(), keywords: z.array(z.string()) });
 
-/** Either the next multiple-choice question, or (done) the research question the answers add up to. */
+/** Either the next single- or multi-select question, or (done) the research question the answers add up to. */
 export const interviewOutput = z.object({
   done: z.boolean(),
   question: z.string(),
   options: z.array(z.object({ label: z.string(), hint: z.string() })),
+  /** The student may pick several options (up to a limit set by grade) instead of one. */
+  multi: z.boolean(),
   researchQuestion: z.string(),
 });
 

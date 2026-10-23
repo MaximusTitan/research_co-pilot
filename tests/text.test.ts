@@ -28,6 +28,6 @@ describe("sentences", () => {
   });
 
   it("doesn't let the grammar fixer capitalise after an abbreviation", () => {
-    expect(fixAllGrammar("Teens were online at 2 a.m. on school nights.", "adult")).toBe("Teens were online at 2 a.m. on school nights.");
+    expect(fixAllGrammar("Teens were online at 2 a.m. on school nights.", "11-12")).toBe("Teens were online at 2 a.m. on school nights.");
   });
 });

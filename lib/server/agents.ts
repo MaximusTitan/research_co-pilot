@@ -5,10 +5,11 @@ import * as offline from "../agents/offline";
 import { aiEnabled, askClaude, askClaudeWithSearch, LANGUAGE, READING_LEVEL, tagSafe } from "./claude";
 import { extractJson, keepGroundedSources } from "../agents/grounding";
 import { keepKnownCitations } from "../citations";
+import { maxPicks } from "../writing";
 
 type Run<A extends AgentName> = (input: AgentInput<A>) => Promise<AgentOutput<A> | null>;
 
-const level = (grade: string) => READING_LEVEL[grade] ?? READING_LEVEL.adult;
+const level = (grade: string) => READING_LEVEL[grade] ?? READING_LEVEL["11-12"];
 const lang = (locale: string) => LANGUAGE[locale] ?? "English";
 
 /** The student's directions as prompt text; their words are data, quoted, never system instructions. */
@@ -22,7 +23,41 @@ const SECTION_WORDS = {
   long: { young: "100-160", older: "200-320" },
 } as const;
 
-const SOURCE_RULES = `Role: Source Discovery Agent. Use the web_search tool to find real pages that help answer the research question.
+/** What makes an essay, a report and a research paper different, for each agent that writes or judges one. */
+const WRITING = {
+  essay: {
+    what: "an essay: the student's own argued answer to a question, with a clear thesis (their position) that every paragraph supports with reasons and evidence",
+    outline: "Each body section is one reason that supports the essay's thesis; title it as a short claim.",
+    intro: "Open with a hook, give a little background, and end with one clear thesis sentence that states the student's position. One paragraph.",
+    body: "Open with a topic sentence that gives one reason for the thesis, back it with 1-2 pieces of evidence from the material each followed by its citation, then explain in the student's voice how it supports the thesis. One paragraph.",
+    conclusion: "Restate the thesis in new words, sum up the reasons, and end with a strong closing thought. Add no new evidence. One paragraph.",
+    interview: "Find out what the student thinks: which side or opinion they take, which reasons convince them most, which examples they find most powerful. At least one question must settle the student's position.",
+    question: "phrase it so the student's position answers it (for example 'Should ...?' or 'Why is ... important?')",
+    feedback: "Check that there is one clear thesis, that each paragraph gives a reason supporting it, and that every reason is backed by cited evidence.",
+  },
+  report: {
+    what: "an information report: a clear, neutral explanation of the facts about the topic, organised under headings",
+    outline: "Each body section explains one sub-topic, like the headings of an information report; title it as a plain topic heading (for example 'Where bees live').",
+    intro: "Introduce the topic in plain words, say why it matters and what the report explains. No opinions. One paragraph.",
+    body: "Explain this sub-topic with 2-3 facts from the material, each followed by its citation. Stay neutral: report what the sources say, with no personal opinion.",
+    conclusion: "Sum up the key facts from each section and say why they matter. No new facts and no personal opinion.",
+    interview: "Find out which sub-topics, facts and examples the report should explain: which parts of the topic, who, where or when. Do not ask for the student's opinion.",
+    question: "phrase it as a question about facts (for example 'How do ...?' or 'What happens when ...?')",
+    feedback: "Check that it explains the facts clearly and neutrally, that each section sticks to its heading, and that every fact is cited.",
+  },
+  paper: {
+    what: "a research paper: a question investigated through published evidence, with analysis of what the sources show and where they agree or disagree",
+    outline: "Each body section examines one part of the evidence; title it as a short academic heading.",
+    intro: "Open with a hook, state the research question, and say what the paper covers. Keep it to one paragraph.",
+    body: "Start with the section's main idea, give 2-3 facts from the material each followed by its citation, then analyse what they show and why they matter.",
+    conclusion: "Answer the research question, sum up the main sections, and suggest one thing future research could look at.",
+    interview: "Narrow what the paper investigates: which part of the topic, a specific angle, who, where or when, which evidence or comparisons to include.",
+    question: "make it one clear, specific research question",
+    feedback: "Check that it answers the research question with evidence, analyses rather than lists facts, and notes where sources disagree.",
+  },
+} as const;
+
+const SOURCE_RULES =`Role: Source Discovery Agent. Use the web_search tool to find real pages that help answer the research question.
 Only suggest pages that your searches returned. Copy each URL exactly as the search gave it.
 Prefer peer-reviewed papers, government and university sites, and established encyclopedias or news.
 Base title, publisher, year and summary only on what the search results show. Leave keyQuote null.
@@ -35,7 +70,7 @@ const runners: { [A in AgentName]: Run<A> } = {
       `Role: Research Planner. Turn the student's idea into research angles, specific questions and a short step-by-step plan.
 Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.
 Give 3 or 4 angles. Each has 2-3 questions that can be researched with published sources. Tags: "lots" (many sources exist), "easy" (simple to research), "harder" (contested or technical), "fewer" (thin evidence).
-The student is writing a ${input.writingType}. Keep the plan to 4-6 short steps.`,
+The student is writing ${WRITING[input.writingType].what}. Keep the plan to 4-6 short steps.`,
       `Student idea: <document>${tagSafe(input.topic)}</document>\nAvoid these angles: ${tagSafe((input.exclude ?? []).join("; ") || "none")}`,
       agents.plan.output,
     );
@@ -110,7 +145,8 @@ Use only what the document says. Write for ${level(input.grade)}. Answer in ${la
 
   outline: async (input) => {
     const ai = await askClaude<typeof agents.outline.output>(
-      `Role: Outline Builder. Group the student's notes into ${BODY_SECTIONS[input.length ?? "standard"]} body sections for a ${input.writingType} that answers the research question.
+      `Role: Outline Builder. Group the student's notes into ${BODY_SECTIONS[input.length ?? "standard"]} body sections for ${WRITING[input.writingType].what}, answering the research question.
+${WRITING[input.writingType].outline}
 For each section give a short title (at most 6 words), a one-sentence keyPoint stating its main idea, and the ids of the notes that belong in it.
 Use only the note ids given, and use each note at most once. Leave out the introduction and conclusion; the app adds those.
 Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
@@ -126,13 +162,9 @@ Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
   },
 
   draft: async (input) => {
-    const shape = {
-      intro: "Open with a hook, state the research question, and say what the paper covers. Keep it to one paragraph.",
-      body: "Start with the section's main idea, give 2-3 facts from the material each followed by its citation, then explain why they matter.",
-      conclusion: "Answer the research question, sum up the main sections, and suggest one thing future research could look at.",
-    }[input.section.kind];
+    const shape = WRITING[input.writingType][input.section.kind];
     const ai = await askClaude<typeof agents.draft.output>(
-      `Role: Writing Partner. Draft one section of the student's ${input.writingType} so they have a strong starting point to read, check and make their own.
+      `Role: Writing Partner. Draft one section of the student's ${input.writingType}, which is ${WRITING[input.writingType].what}, so they have a strong starting point to read, check and make their own.
 ${shape}
 Use only facts that appear in the notes and source summaries given. After each fact, cite its source as [n], using only the numbers listed. Never add facts, numbers, names or quotations that are not in the material.
 If the student already wrote something for this section, keep their ideas and wording where possible and build on it.
@@ -173,7 +205,8 @@ Student notes:\n${input.notes.map((n) => `<note>${tagSafe(n)}</note>`).join("\n"
 
   feedback: async (input) => {
     const ai = await askClaude<typeof agents.feedback.output>(
-      `Role: Reviewer. Give the student kind, specific feedback on their ${input.writingType} draft, like a good teacher would.
+      `Role: Reviewer. Give the student kind, specific feedback on their ${input.writingType} draft, like a good teacher would. It should be ${WRITING[input.writingType].what}.
+${WRITING[input.writingType].feedback}
 overall: 2-3 sentences on how well it answers the research question. strengths: up to 3. improvements: up to 5, each tied to one section title and saying exactly what to do next.
 Do not rewrite the paper. Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
       `Research question: <note>${tagSafe(input.question)}</note>\n${input.sections
@@ -205,13 +238,14 @@ Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
     const max = input.maxQuestions ?? 6;
     const mustFinish = answers.length >= max;
     const ai = await askClaude<typeof agents.interview.output>(
-      `Role: Research Interviewer. Help a student shape their ${input.writingType} by asking short multiple-choice questions, one at a time.
-Each question narrows what the paper will cover: which part of the topic, a specific angle, who, where or when, what stance to take, which examples or sub-topics to include.
+      `Role: Research Interviewer. Help a student shape their ${input.writingType} (${WRITING[input.writingType].what}) by asking short multiple-choice questions, one at a time.
+${WRITING[input.writingType].interview}
+Set multi to true when the student could sensibly pick several options together (sub-topics, reasons or examples to include); they may pick up to ${maxPicks(input.grade)}. Set multi to false when the options are alternatives (a side to take, a single focus, an audience). The first question is always single-choice and sets the focus.
 Build on the earlier answers; never repeat a question or ask something already answered.
 Give 3 or 4 options. Each label is at most 8 words and is a direction that published sources can support; each hint is at most 10 words.
 Do not ask about paper length, citation style or types of sources; those are asked separately.
 ${mustFinish ? "You have asked enough questions: set done to true now." : `Ask at least 3 and at most ${max} questions in total. When you know enough, set done to true.`}
-When done is true, leave question empty and options empty, and set researchQuestion to one clear, specific question the paper will answer that matches every answer. Otherwise leave researchQuestion empty.
+When done is true, leave question empty and options empty, and set researchQuestion to the one question the writing will answer, matching every answer; ${WRITING[input.writingType].question}. Otherwise leave researchQuestion empty.
 Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
       `Topic: <document>${tagSafe(input.topic)}</document>\nQuestions asked so far (${answers.length}):\n${
         answers.map((a, i) => `${i + 1}. <note>${tagSafe(a.question)}</note> Answer: <note>${tagSafe(a.answer)}</note>`).join("\n") || "none"
@@ -220,10 +254,10 @@ Write for ${level(input.grade)}. Answer in ${lang(input.locale)}.`,
     );
     if (!ai) return null;
     const options = ai.options.filter((o) => o.label.trim()).slice(0, 4);
-    if (mustFinish || ai.done) return { done: true, question: "", options: [], researchQuestion: ai.researchQuestion.trim() || input.topic };
+    if (mustFinish || ai.done) return { done: true, question: "", options: [], multi: false, researchQuestion: ai.researchQuestion.trim() || input.topic };
     // A question without real choices can't be answered by tapping; let the offline helper ask instead.
     if (!ai.question.trim() || options.length < 2) return null;
-    return { done: false, question: ai.question.trim(), options, researchQuestion: "" };
+    return { done: false, question: ai.question.trim(), options, multi: ai.multi && answers.length > 0, researchQuestion: "" };
   },
 };
 

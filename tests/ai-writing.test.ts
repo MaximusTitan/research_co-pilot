@@ -25,11 +25,11 @@ describe("keepKnownCitations", () => {
 describe("applyAllFixes", () => {
   it("applies non-overlapping fixes in one pass without shifting positions", () => {
     const text = "becouse their is a the the problem.";
-    expect(applyAllFixes(text, checkGrammar(text, "adult"))).toBe("because there is a the problem.");
+    expect(applyAllFixes(text, checkGrammar(text, "11-12"))).toBe("because there is a the problem.");
   });
 
   it("re-checks until nothing is left to fix", () => {
-    expect(fixAllGrammar("becouse their is a the the problem.", "adult")).toBe("Because there is a the problem.");
+    expect(fixAllGrammar("becouse their is a the the problem.", "11-12")).toBe("Because there is a the problem.");
   });
 });
 

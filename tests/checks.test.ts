@@ -28,14 +28,14 @@ describe("checkGrammar", () => {
   });
 
   it("flags 'their is' and lowercase 'i'", () => {
-    const keys = checkGrammar("their is a problem and i know it.", "adult").map((i) => i.messageKey);
+    const keys = checkGrammar("their is a problem and i know it.", "11-12").map((i) => i.messageKey);
     expect(keys).toEqual(expect.arrayContaining(["theirThere", "lowercaseI"]));
   });
 
   it("flags long sentences for younger grades only past their limit", () => {
     const long = `${Array.from({ length: 24 }, (_, i) => `word${i}`).join(" ")}.`;
     expect(checkGrammar(long, "4-6").some((i) => i.messageKey === "longSentence")).toBe(true);
-    expect(checkGrammar(long, "adult").some((i) => i.messageKey === "longSentence")).toBe(false);
+    expect(checkGrammar(long, "11-12").some((i) => i.messageKey === "longSentence")).toBe(false);
   });
 });
 

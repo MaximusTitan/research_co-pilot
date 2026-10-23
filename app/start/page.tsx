@@ -9,6 +9,7 @@ import { useT } from "../../lib/i18n";
 import { createProject, setQuestion } from "../../lib/project";
 import { projectStore } from "../../lib/store";
 import type { GradeBand, WritingType } from "../../lib/types";
+import { GRADES } from "../../lib/writing";
 
 const WRITING: { value: WritingType; key: "essay" | "report" | "paper"; hint: "essayHint" | "reportHint" | "paperHint"; icon: string }[] = [
   { value: "essay", key: "essay", hint: "essayHint", icon: "✍️" },
@@ -16,7 +17,6 @@ const WRITING: { value: WritingType; key: "essay" | "report" | "paper"; hint: "e
   { value: "paper", key: "paper", hint: "paperHint", icon: "🔬" },
 ];
 
-const GRADES: GradeBand[] = ["4-6", "7-8", "9-10", "11-12", "adult"];
 
 
 export default function StartPage() {

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button, LinkButton, Notice } from "../../components/ui";
 import { RequireProject } from "../../components/shell";
-import { AUTOPILOT_STAGES, runAutopilot, type AutopilotProgress } from "../../lib/client/autopilot";
+import { runAutopilot, stagesFor, type AutopilotProgress } from "../../lib/client/autopilot";
 import { useLocale, useT } from "../../lib/i18n";
 import type { Project } from "../../lib/types";
 
@@ -40,7 +40,8 @@ function Generate({ project }: { project: Project }) {
     start();
   }, []);
 
-  const currentIndex = status === "limited" ? AUTOPILOT_STAGES.length : AUTOPILOT_STAGES.indexOf(progress.stage);
+  const stages = stagesFor(project.writingType);
+  const currentIndex = status === "limited" ? stages.length : stages.indexOf(progress.stage);
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-6 py-4">
@@ -57,7 +58,7 @@ function Generate({ project }: { project: Project }) {
         </p>
 
         <ol className="mt-5 flex flex-col gap-1" aria-live="polite">
-          {AUTOPILOT_STAGES.map((stage, i) => {
+          {stages.map((stage, i) => {
             const done = i < currentIndex;
             const active = i === currentIndex && status === "running";
             const failed = i === currentIndex && status === "failed";

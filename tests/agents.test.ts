@@ -28,8 +28,8 @@ describe("offline helper", () => {
   });
 
   it("drops angles the student asked to skip", () => {
-    const all = offlinePlan({ topic: "Bees", writingType: "essay", grade: "adult", locale: "en" });
-    const skipped = offlinePlan({ topic: "Bees", writingType: "essay", grade: "adult", locale: "en", exclude: [all.angles[0].title] });
+    const all = offlinePlan({ topic: "Bees", writingType: "essay", grade: "11-12", locale: "en" });
+    const skipped = offlinePlan({ topic: "Bees", writingType: "essay", grade: "11-12", locale: "en", exclude: [all.angles[0].title] });
     expect(skipped.angles.map((a) => a.title)).not.toContain(all.angles[0].title);
   });
 
@@ -59,7 +59,7 @@ describe("offline helper", () => {
     const out = offlineGaps({
       question: "Bees",
       sections: [{ title: "Experts disagree", notes: ["Experts disagree about pesticides"] }],
-      grade: "adult",
+      grade: "11-12",
       locale: "en",
     });
     expect(out.gaps.length).toBeGreaterThan(0);

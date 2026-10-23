@@ -287,6 +287,17 @@ mark.key {
 .pp-running { position: absolute; margin: 0; font-size: 10.67px; font-style: italic; color: #555; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pp-folio { position: absolute; left: 0; right: 0; margin: 0; font-size: 10.67px; text-align: center; color: #444; }
 
+/* Reports and essays: one column of 12pt text, the way school work is handed in. */
+.pp-report .pp-col, .pp-essay .pp-col { font-size: 16px; line-height: 1.5; }
+.pp-report .pp-para, .pp-essay .pp-para { text-align: left; hyphens: manual; }
+.pp-report .pp-split, .pp-essay .pp-split { text-align-last: auto; }
+.pp-essay .pp-para { text-indent: 3em; padding-bottom: 6px; scroll-margin-top: 1rem; }
+.pp-essay .pp-para.pp-cont { text-indent: 0; }
+.pp-report .pp-para { padding-bottom: 6px; }
+.pp-report .pp-heading, .pp-report .pp-refHeading { font-size: 17px; font-weight: 700; font-variant: normal; letter-spacing: 0; text-align: left; padding: 14px 0 4px; }
+.pp-essay .pp-refHeading { font-size: 16px; font-weight: 700; font-variant: normal; padding: 18px 0 6px; }
+.pp-report .pp-ref, .pp-essay .pp-ref { font-size: 14px; line-height: 1.4; padding-bottom: 4px; }
+
 @page paper { size: letter; margin: 0; }
 
 @media print {
