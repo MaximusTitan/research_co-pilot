@@ -78,7 +78,7 @@ which the app reaches through [Vercel AI Gateway](https://vercel.com/docs/ai-gat
 3. Restart `pnpm dev`. Next.js reads `.env.local` only at startup.
 
 On Vercel, add the same `AI_GATEWAY_API_KEY` under **Project Settings → Environment Variables**.
-Optional: `RESEARCH_MATE_MODEL` overrides the model (default `anthropic/claude-opus-5-5`).
+Optional: `RESEARCH_MATE_MODEL` overrides the model (default `anthropic/claude-sonnet-5-5`).
 
 ## Where the AI helps
 

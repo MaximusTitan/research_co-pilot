@@ -10,7 +10,7 @@ import { searchedUrlsFrom } from "../agents/grounding";
  * Model ids use the gateway form "provider/model".
  */
 const GATEWAY_URL = "https://ai-gateway.vercel.sh";
-const MODEL = process.env.RESEARCH_MATE_MODEL || process.env.RESEARCH_COPILOT_MODEL || "anthropic/claude-opus-5-5";
+const MODEL = process.env.RESEARCH_MATE_MODEL || process.env.RESEARCH_COPILOT_MODEL || "anthropic/claude-sonnet-5-5";
 
 let client: Anthropic | null = null;
 
